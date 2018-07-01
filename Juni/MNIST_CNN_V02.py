@@ -71,7 +71,7 @@ def convolutional_neural_network(x):
     fc = tf.nn.dropout(fc, keep_rate)
 
     output = tf.matmul(fc, weights['out']) + biases['out']
-
+    print(output.shape)
     return output
 
 
@@ -179,4 +179,4 @@ def traing_at_points():
     thefile.close()
 
 
-traing_at_points()
+convolutional_neural_network(x)
