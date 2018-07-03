@@ -2,12 +2,13 @@ import tensorflow as tf
 from Import_Dataset import import_training_data, import_testing_data
 import random
 
+random_parameters = 1
 # hyperparameters
 batch_size = 128
 n_classes = 10
 keep_rate = 0.9
 keep_prob = tf.placeholder(tf.float32)
-n_epochs = 2000
+n_epochs = 300
 n_evaluations = 3
 adam_learning_rate = 0.001
 
@@ -47,7 +48,7 @@ def cnn(x):
     return output
 
 
-def train_network():
+def setup_network():
     training_data, training_labels = import_training_data()
     dx_train = tf.data.Dataset.from_tensor_slices(training_data)
     dy_train = tf.data.Dataset.from_tensor_slices(training_labels).map(lambda z: tf.one_hot(z, 10))
@@ -77,43 +78,31 @@ def train_network():
 
     init_op = tf.global_variables_initializer()
 
-    # run the training
-    with tf.Session() as sess:
-        merged = tf.summary.merge_all()
-        train_writer = tf.summary.FileWriter('logs/train', sess.graph)
-        test_writer = tf.summary.FileWriter('logs/test')
-        sess.run(init_op)
-        sess.run(training_init_op)
-        for i in range(n_epochs):
-            summary, l, _, acc = sess.run([merged, loss, optimizer, accuracy])
-            train_writer.add_summary(summary, i)
-            if i % 20 == 0:
-                print("Epoch: {}, loss: {:.3f}, training accuracy: {:.2f}%".format(i, l, acc * 100))
-        # now setup the validation run
-        # re-initialize the iterator, but this time with validation data
-        sess.run(validation_init_op)
-        avg_acc = 0
-        for i in range(n_evaluations):
-            acc = sess.run([accuracy])
-            avg_acc += acc[0]
-        print("Average validation set accuracy over {} iterations is {:.2f}%".format(n_evaluations, (avg_acc / n_evaluations) * 100))
-        return avg_acc
+    def train_network():
+        # run the training
+        with tf.Session() as sess:
+            merged = tf.summary.merge_all()
+            train_writer = tf.summary.FileWriter('logs/train', sess.graph)
+            test_writer = tf.summary.FileWriter('logs/test')
+            sess.run(init_op)
+            sess.run(training_init_op)
+            for i in range(n_epochs):
+                summary, l, _, acc = sess.run([merged, loss, optimizer, accuracy])
+                train_writer.add_summary(summary, i)
+                if i % 20 == 0:
+                    print("Epoch: {}, loss: {:.3f}, training accuracy: {:.2f}%".format(i, l, acc * 100))
+            # now setup the validation run
+            # re-initialize the iterator, but this time with validation data
+            sess.run(validation_init_op)
+            avg_acc = 0
+            for i in range(n_evaluations):
+                acc = sess.run([accuracy])
+                avg_acc += acc[0]
+            print("Average validation set accuracy over {} iterations is {:.2f}%".format(n_evaluations, (
+                        avg_acc / n_evaluations) * 100))
+            return avg_acc
+
+    train_network()
 
 
-def random_hyperparameter_search():
-    log = [(0, 0, 0, 0)]
-    for point in range(0, 100):
-        global batch_size
-        batch_size = random.randrange(64, 1028, 128)
-        global n_epochs
-        n_epochs = random.randrange(10, 400, 20)
-        global keep_rate
-        keep_rate = random.random()
-        print("Starting training at Point:")
-        print("batch_size:", batch_size)
-        acc = train_network()
-        log.append((batch_size, n_epochs, keep_rate, acc))
-    print(log)
-
-
-train_network()
+setup_network()
