@@ -9,7 +9,7 @@ import pywt
 from FFST import (scalesShearsAndSpectra,
                   inverseShearletTransformSpect,
                   shearletTransformSpect)
-from FFST._fft import ifftnc # centered nD inverse FFT
+# from FFST._fft import ifftnc # centered nD inverse FFT
 
 gpu_ident = int(sys.argv[1])
 print(gpu_ident)
