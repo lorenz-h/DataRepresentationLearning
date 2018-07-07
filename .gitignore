@@ -1,5 +1,7 @@
 /.idea
 logs/
+Dataset/
 cifar-10-batches-py/
 *.txt
 *.npy
+*.pkl
