@@ -34,7 +34,7 @@ def reshape_batch(input_batch):
 
 
 def preprocess(array):
-    #output = dct(dct(array.T).T)
+    # output = dct(dct(array.T).T)
     output = array
     return output
 
@@ -63,8 +63,15 @@ def import_training_data():
             labels = np.hstack((labels, dictionary[b'labels']))
     images = reshape_batch(images)
     images = images.astype('float32')
+    print(images.shape)
     print("Successfully imported training data")
     return images, labels
 
 
-import_testing_data()
+def main():
+    import_training_data()
+    import_testing_data()
+
+
+if __name__ == "__main__":
+    main()

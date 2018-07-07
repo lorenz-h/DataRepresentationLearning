@@ -1,8 +1,7 @@
 import tensorflow as tf
-from Import_Dataset import import_training_data, import_testing_data
 import argparse
 import os
-
+from import_from_txt import parse_dataset
 
 ########################################################################################################################
 # hyperparameter defaults(some can be ovverriden through arguments):
@@ -28,7 +27,7 @@ def maxpool2d(x):
 
 def cnn(x):
 
-    x = tf.reshape(x, shape=[-1, 32, 32, 3])
+    x = tf.reshape(x, shape=[-1, 480, 640, 3])
 
     w_conv1 = tf.Variable(tf.random_normal([3, 3, 3, 64]))
     b_conv1 = tf.Variable(tf.random_normal([64]))
@@ -54,16 +53,17 @@ def cnn(x):
 
 
 def setup_network():
-    training_data, training_labels = import_training_data()
+    print("Parsing Dataset...")
+    training_data, training_labels, validation_images, validation_labels = parse_dataset()
+    print("Done.")
     dx_train = tf.data.Dataset.from_tensor_slices(training_data)
     dy_train = tf.data.Dataset.from_tensor_slices(training_labels).map(lambda z: tf.one_hot(z, 10))
     train_dataset = tf.data.Dataset.zip((dx_train, dy_train)).shuffle(500).repeat().batch(batch_size)
 
-    validation_images, validation_labels = import_testing_data()
     dx_valid = tf.data.Dataset.from_tensor_slices(validation_images)
     dy_valid = tf.data.Dataset.from_tensor_slices(validation_labels).map(lambda z: tf.one_hot(z, 10))
     valid_dataset = tf.data.Dataset.zip((dx_valid, dy_valid)).shuffle(500).repeat().batch(100)
-
+    print("created Datasets")
     iterator = tf.data.Iterator.from_structure(train_dataset.output_types, train_dataset.output_shapes)
     next_element = iterator.get_next()
 
@@ -155,9 +155,9 @@ def parse_arguments():
 
 
 def main():
-    parse_arguments()
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+
     setup_network()
 
 

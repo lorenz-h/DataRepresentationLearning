@@ -122,6 +122,17 @@ def wavelet_and_crop(array):
     return output
 
 
+def mean_coeffs(shearlet_coeffs):
+    list = []
+    for i in range(shearlet_coeffs.shape[2]):
+        d = np.mean(shearlet_coeffs[..., i])
+        list.append(d)
+    plt.plot(list)
+    plt.ylabel('some numbers')
+    plt.show()
+
+
+
 cached_psi = None
 
 
@@ -131,6 +142,7 @@ def shearlet_and_crop(array):
         ST, cached_psi = shearletTransformSpect(array)
     else:
         ST, psi = shearletTransformSpect(array, cached_psi)
+    mean_coeffs(ST)
     a = ST[0::4, 0::4, 0]
     h = ST[0::4, 0::4, 1]
     v = ST[0::4, 0::4, 2]
@@ -161,7 +173,7 @@ def tf_scale_down_batch(input_batch):
 def preprocess_image(array):
     # input array shape is [28,28]
     # output shape should be [-1, input_shape[0], input_shape[1], 1]
-    output = np.reshape(wavelet_and_crop(array), [-1, input_shape[0]*input_shape[1]])
+    output = np.reshape(shearlet_and_crop(array), [-1, input_shape[0]*input_shape[1]])
     return output
 
 
@@ -207,4 +219,4 @@ def train_at_points():
         thefile.close()
 
 
-train_at_points()
+test_processing()
