@@ -17,7 +17,7 @@ def parse_dataset():
     for i in range(sorted_images.__len__()):
         desired_time = sorted_images[i][1]
         best_matched_label = min(sorted_labels, key=lambda tup: abs(tup[1] - desired_time))
-        if abs(best_matched_label[1] - desired_time) < 100000000:  # deltaTmax = 0.1 seconds
+        if abs(best_matched_label[1] - desired_time) < 50000000:  # deltaTmax = 0.1 seconds
             dataset.append((sorted_images[i][0], best_matched_label[0]))
     print(dataset.__len__())
 
@@ -30,8 +30,8 @@ def parse_dataset():
         file_string = "Dataset/Training/sample"+str(i)+".png"
         imsave(file_string, image)
         label_string = "Dataset/Training/sample"+str(i)+".txt"
-        file = open(label_string, "wb")
-        file.write(labels[i])
+        file = open(label_string, "w")
+        file.write(str(labels[i]))
         file.close()
         if i % 50 == 0:
             print("Storing Sample"+str(i))
@@ -41,13 +41,11 @@ def parse_dataset():
         file_string = "Dataset/Testing/sample"+str(i)+".png"
         imsave(file_string, image)
         label_string = "Dataset/Testing/sample" + str(i) + ".txt"
-        file = open(label_string, "wb")
-        file.write(labels[i])
+        file = open(label_string, "w")
+        file.write(str(labels[i]))
         file.close()
         if i % 50 == 0:
             print("Storing Sample"+str(i))
-
-
 
 
 def main():

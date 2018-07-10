@@ -109,7 +109,12 @@ def parse_batch():
 
 
 def dct_and_crop(array):
+    print(type(array[0][0]))
+    print(array.shape)
+    print(np.amax(array))
     output = dct(dct(array.T).T)
+    print(np.amin(output))
+    print(np.amax(output))
     output = output[0:input_shape[0], 0:input_shape[1]]
     return output
 
@@ -173,7 +178,7 @@ def tf_scale_down_batch(input_batch):
 def preprocess_image(array):
     # input array shape is [28,28]
     # output shape should be [-1, input_shape[0], input_shape[1], 1]
-    output = np.reshape(shearlet_and_crop(array), [-1, input_shape[0]*input_shape[1]])
+    output = np.reshape(dct_and_crop(array), [-1, input_shape[0]*input_shape[1]])
     return output
 
 

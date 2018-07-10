@@ -1,8 +1,4 @@
-import pickle
-
-filepath = "Dataset/Training/sample690.pkl"
-
-pkl_file = open(filepath, 'rb')
-
-data1 = pickle.load(pkl_file)
-print(data1[1])
+the_file = open("Dataset/Training/sample0.txt", "rb")
+label_file = open(file_path, "r")
+label = label_file.read()
+label_file.close()

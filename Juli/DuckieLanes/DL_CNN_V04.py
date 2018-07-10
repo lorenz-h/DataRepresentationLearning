@@ -3,20 +3,29 @@ from scipy.misc import imsave
 from scipy.fftpack import dct
 import numpy as np
 
-batch_size = 16
+batch_size = 64
 shuffle_buffer_size = batch_size*2
 prefetch_buffer_size = batch_size*2
 adam_learning_rate = 0.001
-n_epochs = 30
+n_epochs = 8
+n_evaluations = 3
 
 
 def numpy_preprocess(image):
     red = dct(dct(image[..., 0].T).T)
     green = dct(dct(image[..., 1].T).T)
     blue = dct(dct(image[..., 2].T).T)
-    output = np.dstack((red, blue, green))
+    #output = np.dstack((red, blue, green))
     # output = output[0:input_shape[0], 0:input_shape[1]]
     return image
+
+
+def open_label(file_path):
+    label_file = open(file_path, "r")
+    label = label_file.read()
+    label_file.close()
+    label = float(label)
+    return label
 
 
 def parse_fn(image_path, label_path):
@@ -26,23 +35,32 @@ def parse_fn(image_path, label_path):
     img_cropped = tf.cast(img_cropped, tf.float32)
     img_normalized = tf.image.per_image_standardization(img_cropped)
     img_processed = tf.py_func(numpy_preprocess, [img_normalized], tf.float32)
-    raw = tf.read_file(label_path)
-    label = tf.decode_raw(raw, out_type=tf.float32)*100
-    noise = tf.random_normal(shape=tf.shape(label), mean=0.0, stddev=1.0, dtype=tf.float32)/10000
-    label = label + noise
+    label = tf.py_func(open_label, [label_path], "double")
     return img_processed, label
 
 
+def flip_parse_fn(image_path, label_path):
+    img, label = parse_fn(image_path, label_path)
+    img = tf.image.flip_left_right(img)
+    return img, label
+
+
 def create_dataset(evaluation):
+    global n_epochs
+    global n_evaluations
     if evaluation:
         test_train = "Testing"
     else:
         test_train = "Training"
-    images = tf.data.Dataset.list_files("Dataset/"+test_train+"/*.png", shuffle=False)
-    labels = tf.data.Dataset.list_files("Dataset/"+test_train+"/*.txt", shuffle=False)
-    dataset = tf.data.Dataset.zip((images, labels))
-    dataset = dataset.shuffle(buffer_size=shuffle_buffer_size)
-    dataset = dataset.map(map_func=parse_fn)
+    images = tf.data.Dataset.list_files("Dataset2/"+test_train+"/*.png", shuffle=False)
+    labels = tf.data.Dataset.list_files("Dataset2/"+test_train+"/*.txt", shuffle=False)
+    normal = tf.data.Dataset.zip((images, labels))
+    normal = normal.shuffle(buffer_size=shuffle_buffer_size)
+    flipped = normal.take(-1)
+    normal = normal.map(map_func=parse_fn)
+    flipped = flipped.map(map_func=flip_parse_fn)
+    dataset = normal.concatenate(flipped)
+    dataset = dataset.shuffle(buffer_size=batch_size)
     dataset = dataset.batch(batch_size=batch_size)
     dataset = dataset.prefetch(buffer_size=prefetch_buffer_size)
     return dataset
@@ -53,7 +71,7 @@ def convolution(x, W):
 
 
 def maxpool2d(x):
-    return tf.nn.max_pool(x, ksize=[1, 6, 6, 1], strides=[1, 4, 4, 1], padding='SAME')
+    return tf.nn.max_pool(x, ksize=[1, 3, 3, 1], strides=[1, 3, 3, 1], padding='SAME')
 
 
 def cnn(x):
@@ -87,29 +105,52 @@ val_data = create_dataset(evaluation=True)
 
 
 iterator = tf.data.Iterator.from_structure(tr_data.output_types, tr_data.output_shapes)
-next_element = iterator.get_next()
+next_batch = iterator.get_next()
 training_init_op = iterator.make_initializer(tr_data)
 validation_init_op = iterator.make_initializer(val_data)
-prediction = cnn(next_element[0])
-with tf.device('/device:CPU:0'):
-    loss = tf.cast(tf.losses.absolute_difference(labels=next_element[1], predictions=prediction), dtype=tf.float64)
 
+prediction = cnn(next_batch[0])
+loss = tf.cast(tf.losses.absolute_difference(labels=next_batch[1], predictions=prediction), dtype=tf.float32)
 optimizer = tf.train.AdamOptimizer(learning_rate=adam_learning_rate).minimize(loss)
 
+delta = prediction-tf.cast(next_batch[1], dtype=tf.float32)
 
-equality = tf.equal(tf.round(prediction*10), tf.round(next_element[1]*10))
-accuracy = tf.reduce_mean(tf.cast(equality, tf.float32))
+accuracy = tf.reduce_mean(tf.cast(tf.less(delta, 0.05), dtype=tf.float32))
 
 init_op = tf.global_variables_initializer()
 
+
 with tf.Session() as sess:
     sess.run(init_op)
-    sess.run(training_init_op)
+    print("-" * 20, "Starting Training", "-" * 20)
+    # --------------TRAINING-----------------
     for e in range(n_epochs):
-        img, txt, l, _, acc = sess.run([next_element[0], next_element[1], loss, optimizer, accuracy])
-        if e < 2:
-            for i in range(4):
-                print(txt)
-                imsave("test"+str(i)+".png", img[i])
-        if e % 2 == 0:
-            print("Epoch: {}, loss: {:.3f}, training accuracy: {:.2f}%".format(e, l, acc * 100))
+        i = 0
+        sess.run(training_init_op)
+        while True:
+            try:
+                i = i+1
+                batch = sess.run(next_batch)
+                lss, _, acc = sess.run([loss, optimizer, accuracy])
+                if i % 4 == 0:
+                    print("Processed Batch", i, "with accuracy:", acc)
+            except tf.errors.OutOfRangeError:
+                print("Epoch", e+1, "out of", n_epochs, "done.", i, "Batches in this epoch, last accuracy:", acc)
+                break
+    print("-"*20, "Starting Validation", "-"*20)
+    # --------------Validation-----------------
+    avg_acc = 0
+    i = 0
+    for e in range(n_evaluations):
+        sess.run(validation_init_op)
+        while True:
+            try:
+                lss, _, acc = sess.run([loss, optimizer, accuracy])
+                avg_acc += acc
+                i += 1
+            except tf.errors.OutOfRangeError:
+                print("Evaluation", e + 1, "out of", n_evaluations, "done, last accuracys:", acc)
+                break
+    avg_acc = avg_acc/i
+    print(avg_acc)
+
