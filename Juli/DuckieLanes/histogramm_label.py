@@ -12,5 +12,6 @@ for file in os.listdir("Dataset2/Training"):
         finally:
             f.close()
 arr_labels = np.array(labels)
+print(arr_labels.shape)
 plt.hist(arr_labels, bins=[x/100 for x in range(-20, 20)])
 plt.show()
