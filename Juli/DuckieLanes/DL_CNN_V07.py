@@ -3,20 +3,22 @@ import argparse
 import os
 from scipy.misc import imsave, imread
 import subprocess
+import numpy as np
+import matplotlib.pyplot as plt
 
-from DL_preprocess import numpy_preprocess
-
-
-batch_size = 64
-processing_tog = True
+batch_size = 16
 shuffle_buffer_size = batch_size*2
 prefetch_buffer_size = batch_size*2
 adam_learning_rate = 0.01
-n_epochs = 25
-n_evaluations = 4
-logging = False
+n_epochs = 30
+n_evaluations = 5
+logging = True
 
 gpu_id = 0
+input_shape = (2, 640)
+network_depth = 1
+
+dataset_folder = "Shearlet_Dataset"
 
 
 def convolution(x, W):
@@ -28,65 +30,51 @@ def maxpool2d(x):
 
 
 def cnn(x):
-    x = tf.reshape(x, shape=[-1, 320, 640, 1])
-
-    w_conv1 = tf.Variable(tf.random_normal([3, 3, 1, 32]))
-    b_conv1 = tf.Variable(tf.random_normal([32]))
-    conv1 = tf.nn.relu(convolution(x, w_conv1) + b_conv1)
-    conv1 = maxpool2d(conv1)
-
-    w_conv2 = tf.Variable(tf.random_normal([5, 5, 32, 64]))
-    b_conv2 = tf.Variable(tf.random_normal([64]))
-    conv2 = tf.nn.relu(convolution(conv1, w_conv2) + b_conv2)
-    conv2 = maxpool2d(conv2)
-    conv2_shape = [conv2.shape[1].value, conv2.shape[2].value, conv2.shape[3].value]
-    w_fc = tf.Variable(tf.random_normal([conv2_shape[0] * conv2_shape[1] * conv2_shape[2], 64]))
-    b_fc = tf.Variable(tf.random_normal([64]))
-    fc = tf.reshape(conv2, [-1, conv2_shape[0] * conv2_shape[1] * conv2_shape[2]])
-    fc = tf.matmul(fc, w_fc) + b_fc
-
-    w_out = tf.Variable(tf.random_normal([64, 1]))
-    b_out = tf.Variable(tf.random_normal([1]))
-
-    output = tf.matmul(fc, w_out) + b_out
-    return output
-
-
-def open_label(file_path):
-    """
-    :param file_path: path to label text file
-    :return: label as float
-    """
-    label_file = open(file_path, "r")
-    try:
-        label = label_file.read()
-    finally:
-        label_file.close()
-    label = float(label)
-    return label
+    if len(input_shape) == 3:
+        depth = 3
+    else:
+        depth = 1
+    input_layer = tf.reshape(x, [-1, input_shape[0], input_shape[1], depth])
+    conv1 = tf.layers.conv2d(
+        inputs=input_layer,
+        filters=32,
+        kernel_size=[5, 5],
+        padding="same",
+        activation=None)
+    pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2)
+    conv2 = tf.layers.conv2d(
+        inputs=pool1,
+        filters=64,
+        kernel_size=[5, 5],
+        padding="same",
+        activation=None)
+    pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2)
+    pool2_flat = tf.layers.flatten(pool2)
+    dense = tf.layers.dense(inputs=pool2_flat, units=256, activation=None)
+    dense_2 = tf.layers.dense(inputs=dense, units=64, activation=None)
+    out = tf.layers.dense(inputs=dense_2, units=1, activation=None)
+    return out
 
 
 def grab_files(image_path, label_path):
     img_file = tf.read_file(image_path)
-    img_decoded = tf.image.decode_image(img_file, channels=3)
+    img_decoded = tf.image.decode_image(img_file, channels=1)
+    print(img_decoded.shape)
     img_decoded = tf.cast(img_decoded / 255, dtype=tf.float32)
-    label = tf.py_func(open_label, [label_path], "double")
-    label = label * 10.0
+    label_file = tf.read_file(label_path)
+    label = tf.string_to_number(label_file, out_type=tf.float64)
+    label = tf.cast(label * 100.0, dtype=tf.float32)
     return img_decoded, label
 
 
 def normal_parse_fn(image_path, label_path):
     image, label = grab_files(image_path, label_path)
-    if processing_tog:
-        image = tf.py_func(numpy_preprocess, [image], tf.float32)
     return image, label
 
 
 def flipped_parse_fn(image_path, label_path):
     image, label = grab_files(image_path, label_path)
     image = tf.image.flip_left_right(image)
-    if processing_tog:
-        image = tf.py_func(numpy_preprocess, [image], tf.float32)
     return image, label
 
 
@@ -95,8 +83,8 @@ def create_dataset(evaluation):
         test_train = "Testing"
     else:
         test_train = "Training"
-    images = tf.data.Dataset.list_files("Dataset2/"+test_train+"/*.png", shuffle=False)
-    labels = tf.data.Dataset.list_files("Dataset2/"+test_train+"/*.txt", shuffle=False)
+    images = tf.data.Dataset.list_files(dataset_folder+"/"+test_train+"/*.png", shuffle=False)
+    labels = tf.data.Dataset.list_files(dataset_folder+"/"+test_train+"/*.txt", shuffle=False)
     normal = tf.data.Dataset.zip((images, labels))
     flipped = normal.take(-1)
 
@@ -112,73 +100,84 @@ def create_dataset(evaluation):
 
 def setup_network():
     tr_data = create_dataset(evaluation=False)
-    val_data = create_dataset(evaluation=True)
+    eval_data = create_dataset(evaluation=True)
 
     iterator = tf.data.Iterator.from_structure(tr_data.output_types, tr_data.output_shapes)
     next_features, next_labels = iterator.get_next()
     training_init_op = iterator.make_initializer(tr_data)
-    validation_init_op = iterator.make_initializer(val_data)
+    eval_init_op = iterator.make_initializer(eval_data)
 
     prediction = cnn(next_features)
-    loss = tf.cast(tf.losses.absolute_difference(labels=next_labels, predictions=prediction), dtype=tf.float32)
-    tf.summary.scalar('loss', loss)
+
+    loss = tf.reduce_mean(tf.losses.absolute_difference(
+        labels=tf.expand_dims(next_labels, -1),
+        predictions=prediction,
+        reduction=tf.losses.Reduction.NONE))
+
+    loss_summary = tf.summary.scalar('loss', loss)
+
+    batch_avg_labels = tf.reduce_mean(tf.abs(next_labels))
+
     optimizer = tf.train.AdamOptimizer(learning_rate=adam_learning_rate).minimize(loss)
-
-    accuracy = tf.cast(tf.losses.absolute_difference(labels=next_labels, predictions=prediction), dtype=tf.float32)
-
+    accuracy = tf.cast(tf.losses.absolute_difference(labels=tf.expand_dims(next_labels, -1), predictions=prediction),
+                       dtype=tf.float32)
     init_op = tf.global_variables_initializer()
 
     with tf.Session() as sess:
         if logging:
-            gpu_logdir = "gpu" + str(gpu_id) + "processing" + str(processing_tog)
-            train_logdir = os.path.join("logs", gpu_logdir, "train")
-            test_logdir = os.path.join("logs", gpu_logdir, "test")
-            merged = tf.summary.merge_all()
+            sub_logdir = "gpu" + str(batch_size)+"_"+str(adam_learning_rate)+"_"+str(n_epochs)
+            train_logdir = os.path.join("logs", sub_logdir, "train")
+            test_logdir = os.path.join("logs", sub_logdir, "test")
             train_writer = tf.summary.FileWriter(train_logdir, sess.graph)
             test_writer = tf.summary.FileWriter(test_logdir)
 
         sess.run(init_op)
-        i = 0
         print("Starting Training...")
+        i = 0
         for epoch in range(1, n_epochs+1):
             sess.run(training_init_op)
-            epoch_loss = 0
-            epoch_acc = 0
-            batches = 0
+            avg_epoch_loss = 0
+            batch_counter = 0
+            while True:  # iterate over all batches
+                try:
+                    if logging:
+                        lss, summary, _, acc = sess.run([loss, loss_summary, optimizer, accuracy])
+                        train_writer.add_summary(summary, i)
+                    else:
+                        lss, _, acc = sess.run([loss, optimizer, accuracy])
+                    avg_epoch_loss += lss
+                    batch_counter += 1
+                    i += 1
+                except tf.errors.OutOfRangeError:
+                    break
+            avg_epoch_loss = avg_epoch_loss / batch_counter
+
+            print("Finished Epoch", epoch, "- Training Loss:", avg_epoch_loss)
+
+        print("Starting Evaluation...")
+        batch_counter = 0
+        avg_eval_loss = 0
+        avg_labels = 0
+
+        for ev in range(1, n_evaluations+1):
+            sess.run(eval_init_op)
+            avg_labels = 0
             while True:
                 try:
                     if logging:
-                        summary, lss, _, acc = sess.run([merged, loss, optimizer, accuracy])
-                        train_writer.add_summary(summary, i)
-                        i += 1
+                        lss, summary, labels = sess.run([loss, loss_summary, batch_avg_labels])
+                        test_writer.add_summary(summary, batch_counter)
                     else:
-                        lss, _, acc = sess.run([loss, optimizer, accuracy])
-                    epoch_loss += lss
-                    epoch_acc += acc
-                    batches += 1
+                        lss, labels = sess.run([loss, batch_avg_labels])
+                    avg_eval_loss += lss
+                    avg_labels += labels
+                    batch_counter += 1
                 except tf.errors.OutOfRangeError:
                     break
-            epoch_loss = epoch_loss/batches/batch_size
-            epoch_acc = epoch_acc/batches/batch_size
-            print("Finished Epoch", epoch, "- Training Loss:", epoch_loss, "- Accuracy:", epoch_acc)
-        print("Starting Evaluation...")
-        for ev in range(n_evaluations):
-            sess.run(validation_init_op)
-            eval_acc = 0
-            batches = 0
-            while True:
-                try:
-                    images, acc = sess.run([next_features, loss])
-                    if batches < 5:
-                        image = images[0, ...]
-                        imsave(str(batches)+".png", image)
-                    eval_acc += acc
-                    batches += 1
-                except tf.errors.OutOfRangeError:
-                    break
-            print("Evaluation", ev, "done.")
-        eval_acc = eval_acc/batches/batch_size
-        print("Average Accuracy over", n_evaluations, "was", eval_acc)
+            print("Evaluation", ev,"done.")
+        avg_eval_loss = avg_eval_loss / batch_counter
+        avg_labels = avg_labels / batch_counter
+        print("Average Loss:", avg_eval_loss, "Average Label Size:", avg_labels)
 
 
 class Colors:
@@ -206,7 +205,6 @@ def parse_arguments():
     parser.add_argument("--adam_learning_rate", type=type(globals()["adam_learning_rate"]))
     parser.add_argument("--n_epochs", type=type(globals()["n_epochs"]))
     parser.add_argument("--logging", type=str2bool)
-    parser.add_argument("--processing_tog", type=str2bool)
 
     args = parser.parse_args()
 
@@ -234,11 +232,12 @@ def check_available_gpus():
     assert False, "All GPUs are currently busy."
 
 
-def check_preprocessing_pipeline():
-    file_string = "Dataset2/Training/sample" + str(120) + ".png"
-    image = imread(file_string).astype(float)
-    output = numpy_preprocess(image)
-    return output.shape
+def get_input_shape():
+    file_string = dataset_folder + "/Training/sample0.png"
+    image = imread(file_string)
+    # plt.imshow(image)
+    # plt.show()
+    return image.shape
 
 
 def main():
@@ -247,11 +246,11 @@ def main():
 
     gpu_id = check_available_gpus()
     print("GPU", gpu_id, "is free and will be used.")
+
+    input_shape = get_input_shape()
+    print("Found input shape to be", input_shape)
+
     parse_arguments()
-
-    input_shape = check_preprocessing_pipeline()
-    print("Preprocessing generates array with shape:"+str(input_shape))
-
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
 

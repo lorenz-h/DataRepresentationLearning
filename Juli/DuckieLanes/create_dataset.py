@@ -27,23 +27,27 @@ def parse_dataset():
     print(images.shape)
     for i in range(0, int(images.shape[0]*0.8)):
         image = images[i, ...]
-        file_string = "Dataset/Training/sample"+str(i)+".png"
+        file_string = "DatasetV2/Training/sample"+str(i)+".png"
         imsave(file_string, image)
-        label_string = "Dataset/Training/sample"+str(i)+".txt"
-        file = open(label_string, "w")
-        file.write(str(labels[i]))
-        file.close()
+        label_string = "DatasetV2/Training/sample"+str(i)+".txt"
+        try:
+            file = open(label_string, "w")
+            file.write(str(labels[i]))
+        finally:
+            file.close()
         if i % 50 == 0:
             print("Storing Sample"+str(i))
 
     for i in range(int(images.shape[0]*0.8), images.shape[0]):
         image = images[i, ...]
-        file_string = "Dataset/Testing/sample"+str(i)+".png"
+        file_string = "DatasetV2/Testing/sample"+str(i)+".png"
         imsave(file_string, image)
-        label_string = "Dataset/Testing/sample" + str(i) + ".txt"
-        file = open(label_string, "w")
-        file.write(str(labels[i]))
-        file.close()
+        label_string = "DatasetV2/Testing/sample" + str(i) + ".txt"
+        try:
+            file = open(label_string, "w")
+            file.write(str(labels[i]))
+        finally:
+            file.close()
         if i % 50 == 0:
             print("Storing Sample"+str(i))
 

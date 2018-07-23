@@ -2,6 +2,11 @@
 logs/
 Dataset/
 Dataset2/
+Dataset_V02/
+DCT_Dataset_V02/
+Shearlet_Dataset_V02/
+Resized_Dataset_V02/
+Shearlet_Dataset/
 cifar-10-batches-py/
 *.txt
 *.npy

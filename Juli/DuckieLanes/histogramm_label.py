@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 labels = []
-for file in os.listdir("Dataset2/Training"):
+for file in os.listdir("Dataset_V02/Training"):
     if file.endswith(".txt"):
         f = open("Dataset2/Training/"+file, 'r')
         try:

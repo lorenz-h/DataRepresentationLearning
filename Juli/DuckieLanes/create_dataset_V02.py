@@ -17,6 +17,6 @@ for i in range(sorted_images.__len__()):
 print(dataset.__len__())
 
 print(dataset[0][0].shape)
-file_string = "Dataset/Training/sample"+str(0)+".png"
+file_string = "DatasetV2/Training/sample"+str(0)+".png"
 imsave(file_string, dataset[0][0])
 
