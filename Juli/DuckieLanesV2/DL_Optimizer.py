@@ -5,11 +5,11 @@ import subprocess
 import time
 import pickle
 
-n_gpus = 8
+n_gpus = 5
 # this specifies the number of gpus that should be used in paralell to evaluate the objective.
 n_calls = 4
 # n_calls specifies how many optimization steps the bayesian optimizer will take.
-n_runs = 2
+n_runs = 1
 # n_runs specifies how often the network will be evaluated at one point to account for the randomly initialized weights
 
 dim_learning_rate = Real(low=1e-6, high=1e-1, prior='log-uniform', name='learning_rate')
@@ -60,7 +60,7 @@ def bayesian_optimize():
         dimensions=[dim_learning_rate, dim_n_epochs, dim_n_convolutions, dim_dense_nodes],
         random_state=1
     )
-    gpus = range(0, n_gpus)
+    gpus = range(3, n_gpus+3)
     for i in range(1, n_calls+1):
         x = optimizer.ask(n_points=n_gpus)  # x is a list of n_points points
         p = Pool(n_gpus)

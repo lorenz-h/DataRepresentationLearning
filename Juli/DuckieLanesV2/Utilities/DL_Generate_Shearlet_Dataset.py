@@ -60,13 +60,13 @@ def full_wavelet_preprocessing(image):
 
 
 def write_files():
-    raw_image_file_names = list_files("Dataset_V02/Training/", "png")
+    raw_image_file_names = list_files("../Dataset_V02/Training/", "png")
     i = 0
     for file_name in raw_image_file_names:
         i += 1
-        img = imread("Dataset_V02/Training/" + file_name)
+        img = imread("../Dataset_V02/Training/" + file_name)
         img = full_wavelet_preprocessing(img)
-        imsave("Shearlet_Dataset_V02/Training/" + file_name, img)
+        # imsave("Shearlet_Dataset_V02/Training/" + file_name, img)
         if i % 20 == 0:
             print("image", str(i), "processed")
 

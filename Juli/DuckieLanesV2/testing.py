@@ -1,6 +1,6 @@
 import tensorflow as tf
 from DL_Input_Pipeline import create_dataset
-from DL_Utilities import get_input_shape, classify, gen_bins
+from DL_Utilities import get_input_shape
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -19,13 +19,17 @@ with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
     sess.run(training_init_op)
     labels = []
-    ll = sess.run(next_labels)
-    ll = sess.run(next_labels)
-    ll = sess.run(next_labels)
-    labels.append(ll)
+    while True:
+        try:
+            ll = sess.run(next_labels)
+            labels.append(ll)
+        except tf.errors.OutOfRangeError:
+            break
+
 labels = np.array(labels)
 labels = labels.flatten()
-bin_list = gen_bins()
-for i in range(labels.size):
-    labels[i] = classify(labels[i], bin_list)
+print(type(labels))
+print(labels.shape)
+error = np.abs(labels - 9.93)
+print(np.mean(error))
 

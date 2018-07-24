@@ -4,6 +4,7 @@ import argparse
 import tensorflow as tf
 import os
 import numpy as np
+from os import listdir
 
 
 class Colors:
@@ -140,3 +141,12 @@ def get_convolutions(n_convs):
         convolutions.append((i*32, 5, 5))
     return convolutions
 
+
+def list_files(directory, extension):
+    return (f for f in listdir(directory) if f.endswith('.' + extension))
+
+
+def grayscale(array):
+    assert array.ndim == 3
+    array = np.mean(array, 2)
+    return array

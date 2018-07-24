@@ -4,11 +4,11 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
 
-setups = pickle.load(open("../logs/optimizer_points_shearlet.pkl", "rb"))
+setups = pickle.load(open("../logs/optimizer_points_wavelet.pkl", "rb"))
 results, points = zip(*setups)
 learning_rate, n_epochs, n_convolutions, n_dense_nodes = zip(*points)
 results = np.clip(results, 0.0, 1.0)
-
+learning_rate = np.clip(learning_rate, 0.0, 0.005)
 fig = plt.figure(dpi=300)
 ax = fig.add_subplot(111, projection='3d')
 

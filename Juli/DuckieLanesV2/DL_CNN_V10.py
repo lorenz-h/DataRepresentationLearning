@@ -18,7 +18,7 @@ n_dense_nodes = 196
 n_runs = 1
 
 # #############################################################################
-dataset_folder = "Shearlet_Dataset_V02"
+dataset_folder = "Dataset_V02"
 allowed_arguments = ["n_epochs", "logging", "n_evaluations", "learning_rate",
                      "dataset_folder", "n_runs", "batch_size", "gpu_id", "n_convolutions", "n_dense_nodes"]
 
@@ -66,7 +66,7 @@ def cnn(x, input_shape, convs):
             filters=conv[0],
             kernel_size=[conv[1], conv[2]],
             padding="same",
-            activation=None)
+            activation=tf.nn.relu)
         input_arr = tf.layers.max_pooling2d(inputs=cnv, pool_size=[2, 2], strides=2)
     pool2_flat = tf.layers.flatten(input_arr)
     dense = tf.layers.dense(inputs=pool2_flat, units=n_dense_nodes, activation=None)

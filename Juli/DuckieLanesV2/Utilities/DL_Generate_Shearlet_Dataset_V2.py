@@ -3,8 +3,11 @@ from os import listdir
 import pyshearlab
 import pickle
 import numpy as np
+import matplotlib.pyplot as plt
 
-shearlet_system = None
+source_folder = "../Dataset_V02/Training/"
+destination_folder = "../Shearlet_Dataset_V02_2/Training/"
+j_max = 2
 
 
 def list_files(directory, extension):
@@ -17,46 +20,67 @@ def grayscale(array):
     return array
 
 
-def get_shearlet_system(sizex, sizey, j_max):
-    global shearlet_system
-    if shearlet_system is None:
-        cached_systems = list_files("_cache", "pkl")
-        cache_file_name = "200_200_2.pkl"
-        if cache_file_name in cached_systems:
-            try:
-                pkl_file = open("_cache/" + cache_file_name, 'rb')
-                shearlet_system = pickle.load(pkl_file)
-            finally:
-                pkl_file.close()
-        else:
-            shearlet_system = pyshearlab.SLgetShearletSystem2D(0, sizex, sizey, j_max)
-            try:
-                pkl_file = open("_cache/" + cache_file_name, 'wb')
-                shearlet_system = pickle.dump(shearlet_system, pkl_file)
-            finally:
-                pkl_file.close()
+def pad_to_square(array):
+    max_len = max(array.shape)
+    min_len = min(array.shape)
+    output = np.zeros([max_len, max_len])
+    output[0:min_len, :] = array
+    return output
 
 
-def shearlet_preprocessing():
+def grab_image(file):
+    img = imread(source_folder + file)
+    img = grayscale(img)
+    img = pad_to_square(img)
+    img = img / np.amax(img)
+    assert img.ndim == 2 and img.shape[0] == img.shape[1]
+    return img
 
-    return 0
+
+def get_shearlet_system(input_size):
+    cached_systems = list_files("_cache/", "pkl")
+    file_name = str(input_size)+"_"+str(j_max)+".pkl"
+    if file_name in cached_systems:
+        try:
+            sh_file = open("_cache/"+file_name, "rb")
+            shearlet_sys = pickle.load(sh_file)
+        finally:
+            sh_file.close()
+        print("Using Cached Shearlet System.")
+    else:
+        print("No Cached System found. Generating System...")
+        shearlet_sys = pyshearlab.SLgetShearletSystem2D(0, input_size, input_size, j_max)
+        try:
+            sh_file = open("_cache/"+file_name, "wb")
+            shearlet_sys = pickle.dump(shearlet_sys, sh_file)
+        finally:
+            sh_file.close()
+        print("Generated new Shearlet System")
+    return shearlet_sys
 
 
-def write_files():
-    raw_image_file_names = list_files("../Dataset_V02/Training/", "png")
+def write_files(shear_sys, raw_image_file_names):
     i = 0
     for file_name in raw_image_file_names:
         i += 1
-        img = imread("../Dataset_V02/Training/" + file_name)
-        get_shearlet_system(460, 640, 2)
-        img = shearlet_preprocessing(img)
-        imsave("Shearlet_Dataset_V02/Training/" + file_name, img)
+        img = grab_image(file_name)
+        coeffs = pyshearlab.SLsheardec2D(img, shear_sys)
+        coeffs = coeffs[0:320, :]
+        flt = np.mean(coeffs[..., 6:13], -1)
+        flt = flt - np.amin(flt)
+        flt = flt / np.amax(flt)
+        imsave(destination_folder + file_name, flt)
         if i % 20 == 0:
-            print("image", str(i), "processed")
+            print("Image", i, "done.")
 
 
 def main():
-    get_shearlet_system(200,200,2)
+    raw_image_file_names = list_files(source_folder, "png")
+    file_0 = next(raw_image_file_names)
+    img0 = grab_image(file_0)
+    input_shape = img0.shape[0]
+    shearlet_system = get_shearlet_system(input_shape)
+    write_files(shearlet_system, raw_image_file_names)
 
 
 if __name__ == "__main__":
