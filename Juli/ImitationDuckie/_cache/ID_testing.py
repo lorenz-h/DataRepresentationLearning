@@ -1,0 +1,11 @@
+batch_size = 32
+n_max_epochs = 30
+n_evaluations = 3
+learning_rate = 0.001
+logging = False
+prefetch_buffer_size = batch_size*2
+gpu_id = 1
+n_convolutions = 2
+n_dense_nodes = 196
+n_runs = 1
+automatic_gpu_placement = False
