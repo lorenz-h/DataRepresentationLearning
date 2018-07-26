@@ -1,11 +1,18 @@
 import tensorflow as tf
 import os
 
-from _utils.ID_utils import check_available_gpus, get_input_shape, Colors, str2bool, Logger, get_convolutions
+from _utils.ID_utils import Logger
 from ID_Input_Pipeline import create_dataset
 
 
 def cnn(x, args):
+    """
+    the actual network graph
+    :param x: a single image or a batch of images to be passed into the network. Tensorflow automatically adjusts wether
+    one image or a batch is passed.
+    :param args: ParameterBatch object as defined in ID_Optimizer.py
+    :return: the output of the network
+    """
     input_layer = tf.reshape(x, [-1, args.input_shape[0], args.input_shape[1], args.input_shape[2]])
     input_arr = input_layer
     for conv in args.convolutions:
@@ -15,19 +22,24 @@ def cnn(x, args):
             kernel_size=[conv[1], conv[2]],
             padding="same",
             activation=tf.nn.relu)
-        input_arr = tf.layers.max_pooling2d(inputs=cnv, pool_size=[2, 2], strides=2)
+        input_arr = tf.layers.max_pooling2d(inputs=cnv, pool_size=[3, 3], strides=2)
     pool2_flat = tf.layers.flatten(input_arr)
-    dense = tf.layers.dense(inputs=pool2_flat, units=args.n_dense_nodes, activation=None)
-    dense_2 = tf.layers.dense(inputs=dense, units=int(args.n_dense_nodes/2), activation=None)
+    dense = tf.layers.dense(inputs=pool2_flat, units=args.n_dense_nodes, activation=tf.nn.relu)
+    dense_2 = tf.layers.dense(inputs=dense, units=int(args.n_dense_nodes/2), activation=tf.nn.relu)
     out = tf.layers.dense(inputs=dense_2, units=1, activation=None)
     return out
 
 
 def spawn_network(args):
+    """
+    Defines the graph and runs the network.
+    :param args: ParameterBatch object as defined in ID_Optimizer.py
+    :return: either test or eval loss, depending on args.training
+    """
     tf.reset_default_graph()
-    train_data = create_dataset(args.batch_size, "_data/hetzell_training_data.csv")
-    eval_data = create_dataset(args.batch_size, "_data/hetzell_evaluation_data.csv")
-    test_data = create_dataset(args.batch_size, "_data/hetzell_testing_data.csv")
+    train_data = create_dataset(args.batch_size, "_data/hetzell_raw_training_data.csv")
+    eval_data = create_dataset(args.batch_size, "_data/hetzell_raw_evaluation_data.csv")
+    test_data = create_dataset(args.batch_size, "_data/hetzell_raw_testing_data.csv")
 
     iterator = tf.data.Iterator.from_structure(train_data.output_types, train_data.output_shapes)
     next_features, next_labels = iterator.get_next()
@@ -54,6 +66,10 @@ def spawn_network(args):
         sess.run(tf.global_variables_initializer())
 
         def test_performance():
+            """
+            tests the networks performance.
+            :return: the training accuracy
+            """
             sess.run(test_init_op)
             batches = 0
             test_loss = 0
@@ -62,14 +78,22 @@ def spawn_network(args):
                     lss, acc = sess.run([loss, accuracy])
                     test_loss += lss
                     batches += 1
+                    if batches % 50 == 0:
+                        print("GPU", args.gpu_id, ": Testbatch", batches, "done.")
                 except tf.errors.OutOfRangeError:
                     break
             assert batches is not 0, "NO TEST DATA PASSED"
             test_loss /= batches
             return test_loss
 
-        def evaluate_performance():
+        def evaluate_performance(ep):
+            """
+            runs the network over the evaluation_dataset.
+            :param ep: the training epoch in which the evaluation is performed
+            :return: the evaluation loss
+            """
             sess.run(eval_init_op)
+            evaluation_logger = Logger(logdir + "/eval")
             batches = 0
             ev_loss = 0
             while True:
@@ -77,15 +101,22 @@ def spawn_network(args):
                     lss, acc = sess.run([loss, accuracy])
                     ev_loss = ev_loss + lss
                     batches += 1
+                    if batches % 50 == 0:
+                        print("GPU", args.gpu_id, ": Evaluation batch", batches, "done.")
                 except tf.errors.OutOfRangeError:
                     break
             assert batches is not 0, "NO EVALUATION DATA PASSED"
             ev_loss /= batches
+            evaluation_logger.log_scalar("evaluation_loss", ev_loss, ep)
             return ev_loss
 
-        def training(lg_dir):
-            training_logger = Logger(lg_dir+"/train")
-            evaluation_logger = Logger(lg_dir + "/eval")
+        def training():
+            """
+            trains the network and evaluates the performance every 3 epochs. Once eval error starts increasing
+            stop the training and return the smallest evaluation error achieved.
+            :return: the smallest evaluation loss.
+            """
+            training_logger = Logger(logdir+"/train")
             eval_losses = []
             epoch = 0
             while epoch < args.n_max_epochs:
@@ -96,59 +127,51 @@ def spawn_network(args):
                     try:
                         lss, _, acc = sess.run([loss, optimizer, accuracy])
                         epoch_loss = epoch_loss + lss
-                        training_logger.log_scalar("epoch_training_loss" + str(args.gpu_id), epoch_loss, epoch)
                         batches += 1
+                        if batches % 50 == 0:
+                            print("GPU", args.gpu_id, ": Batch", batches, "done.")
                     except tf.errors.OutOfRangeError:
                         break
                 epoch_loss /= batches
+                training_logger.log_scalar("epoch_training_loss", epoch_loss, epoch)
                 print("Epoch", epoch, "on GPU", args.gpu_id, "- Training loss was:", epoch_loss)
-                if epoch % 5 == 1:
-                    eval_loss = evaluate_performance()
-                    evaluation_logger.log_scalar("evaluation_loss", eval_loss, epoch)
+                if epoch % 3 == 1:
+                    eval_loss = evaluate_performance(epoch)
                     eval_losses.append(eval_loss)
                     print("Epoch", epoch, "on GPU", args.gpu_id, "- Evaluation loss was:", eval_loss)
-                    print(len(list((lss < eval_loss for lss in eval_losses))))
-                    if len(list((lss < eval_loss for lss in eval_losses))) > 5:
+                    if len(list([ls < eval_loss for ls in eval_losses])) > 5:
                         print("evaluation error has been increasing again.")
                         break
                 epoch += 1
             smallest_eval_loss = sorted(eval_losses)[0]
             return smallest_eval_loss
 
-        experiment_logdir = "gpu" + str(args.batch_size) + "_" + str(args.learning_rate) + "_" + str(args.gpu_id)
+        experiment_logdir = "gpu" + str(args.batch_size) + "_" + str(args.learning_rate) + \
+                            str(args.n_dense_nodes) + "_" + str(args.gpu_id)
         logdir = os.path.join("_logs", experiment_logdir)
         if args.training:
-            return training(logdir)
+            return training()
         else:
-            training(logdir)
+            training()
             return test_performance()
 
 
 def setup_thread_environment(args):
-
-    if args.automatic_gpu_placement:
-        args.gpu_id = check_available_gpus()
-        print(Colors.OKGREEN, "GPU", args.gpu_id, "is free and will be used.", Colors.ENDC)
-    else:
-        print(Colors.OKGREEN, "GPU", args.gpu_id, "has been parsed and will be used.", Colors.ENDC)
+    """
+    creates an environment in which to run the network. spawns the network n_runs times and averages the loss returned
+    by the network ( either eval or test, depending on args.training)
+    :param args: ParameterBatch object as defined in ID_Optimizer.py
+    :return: ---
+    """
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu_id)
 
     acc = 0
-    label_size = 0
     for it in range(0, args.n_runs):
         lss = spawn_network(args)
         acc += lss
         tf.reset_default_graph()  # this clears the graph
     acc = acc / args.n_runs
     return acc
-
-
-def main():
-    setup_thread_environment()
-
-
-if __name__ == "__main__":
-    main()
 
 

@@ -1,5 +1,7 @@
 /.idea
 logs/
+_logs/
+_cache/
 Dataset/
 Dataset2/
 Dataset_V02/

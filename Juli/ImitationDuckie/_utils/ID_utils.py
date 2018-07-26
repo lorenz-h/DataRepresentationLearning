@@ -1,5 +1,4 @@
 import subprocess
-from scipy.misc import imread
 import argparse
 import tensorflow as tf
 import os
@@ -33,11 +32,6 @@ def check_available_gpus():
             gpus.append(gpu)
     assert len(gpus) is not 0, "All GPUs are currently busy."
     return gpus
-
-
-def get_input_shape(folder):
-    imshape = [480, 640, 3]
-    return imshape
 
 
 def str2bool(v):
@@ -134,10 +128,21 @@ def get_convolutions(n_convs):
 
 
 def list_files(directory, extension):
+    """
+    lists all files in directory with extension extension.
+    :param directory: the directory to search.
+    :param extension: the extension of the files to list without the point
+    :return:
+    """
     return (f for f in listdir(directory) if f.endswith('.' + extension))
 
 
 def grayscale(array):
+    """
+    converts an rgb image to grayscale
+    :param array: the image to convert
+    :return: the 2D grayscale image
+    """
     assert array.ndim == 3
     array = np.mean(array, 2)
     return array
