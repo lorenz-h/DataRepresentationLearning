@@ -8,25 +8,31 @@ import pickle
 from ID_CNN_V01 import setup_thread_environment
 from _utils.ID_utils import get_convolutions, Colors, check_available_gpus
 
+n_calls = 7
+
 dim_learning_rate = Real(low=1e-7, high=3e-2, prior='log-uniform', name='learning_rate')
-dim_n_convolutions = Integer(low=1, high=4, name='n_convolutions')
-dim_dense_nodes = Integer(low=64, high=256, name='n_dense_nodes')
+dim_n_convolutions = Integer(low=1, high=3, name='n_convolutions')
+dim_dense_nodes = Integer(low=128, high=200, name='n_dense_nodes')
 
 
 class ParameterBatch:
     """
-    Object containing all hyperparameters needed to run the network.
+    Class of Object containing all hyperparameters needed to run the network.
     """
     def __init__(self,
-                 learning_rate=0.001,
+                 learning_rate=0.0005,
                  input_shape=[480, 640, 1],
-                 batch_size=32,
-                 convolutions=[(64, 5, 5), (128, 5, 5)],
+                 batch_size=16,
+                 convolutions=[(64, 7, 7), (128, 5, 5)],
                  gpu_id=2,
-                 n_dense_nodes=64,
+                 n_dense_nodes=128,
                  n_max_epochs=30,
                  n_runs=1,
-                 training=True):
+                 training=True,
+                 train_csv_file="_data/hetzell_shearlet_training_data.csv",
+                 eval_csv_file="_data/hetzell_shearlet_evaluation_data.csv",
+                 test_csv_file="_data/hetzell_shearlet_testing_data.csv"
+                 ):
         self.learning_rate = learning_rate
         self.input_shape = input_shape
         self.batch_size = batch_size
@@ -36,6 +42,9 @@ class ParameterBatch:
         self.n_max_epochs = n_max_epochs
         self.n_runs = n_runs
         self.training = training
+        self.train_csv_file = train_csv_file
+        self.test_csv_file = test_csv_file
+        self.eval_csv_file = eval_csv_file
 
 
 def map_val_to_param_batch(vals, gpu_id):
@@ -52,7 +61,7 @@ def map_val_to_param_batch(vals, gpu_id):
     return params
 
 
-def bayesian_optimize(n_calls=2):
+def bayesian_optimize(n_calls=12):
     """
     Apply bayesian optimization to a network. Access global variable reserved_gpus, Ask Optimizer for one point for each GPU,
     train and evaluate at that point in parallellized threads, repeat n_calls times. Then train and test the best setup.
@@ -79,6 +88,9 @@ def bayesian_optimize(n_calls=2):
     print(min(optimizer.yi))  # print the best objective found
     sorted_sets = sorted(list(zip(optimizer.yi, optimizer.Xi)), key=lambda tup: tup[0])
     print("BEST SET:", sorted_sets[0])
+    print("#" * 100)
+    print(Colors.OKBLUE, "Starting Testing of Best Set.", Colors.ENDC)
+    print("#" * 100)
     gpus = list(reserved_gpus)
     test_args = map_val_to_param_batch(sorted_sets[0][1], gpus.pop(0))
     test_args.training = False
@@ -110,7 +122,7 @@ def main():
     subprocess.run(command_str, shell=True)
     reserved_gpus = check_available_gpus()
     print("GPUs", reserved_gpus, "are available.")
-    bayesian_optimize()
+    bayesian_optimize(n_calls=n_calls)
 
 
 if __name__ == "__main__":

@@ -37,9 +37,9 @@ def spawn_network(args):
     :return: either test or eval loss, depending on args.training
     """
     tf.reset_default_graph()
-    train_data = create_dataset(args.batch_size, "_data/hetzell_raw_training_data.csv")
-    eval_data = create_dataset(args.batch_size, "_data/hetzell_raw_evaluation_data.csv")
-    test_data = create_dataset(args.batch_size, "_data/hetzell_raw_testing_data.csv")
+    train_data = create_dataset(args.batch_size, args.train_csv_file)
+    eval_data = create_dataset(args.batch_size, args.eval_csv_file)
+    test_data = create_dataset(args.batch_size, args.test_csv_file)
 
     iterator = tf.data.Iterator.from_structure(train_data.output_types, train_data.output_shapes)
     next_features, next_labels = iterator.get_next()
@@ -55,12 +55,12 @@ def spawn_network(args):
         reduction=tf.losses.Reduction.NONE)
 
     loss = tf.reduce_mean(element_loss)
+    static_approx_error = tf.cast(0.13651795418710108, dtype=tf.float32)
 
-    accuracy = tf.reduce_mean(tf.cast(tf.less(element_loss, 0.63), dtype=tf.float32))
+    accuracy = tf.divide((static_approx_error - loss), static_approx_error)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate).minimize(loss)
 
-    batch_avg_labels = tf.reduce_mean(tf.abs(next_labels))
     with tf.Session() as sess:
 
         sess.run(tf.global_variables_initializer())
@@ -70,12 +70,13 @@ def spawn_network(args):
             tests the networks performance.
             :return: the training accuracy
             """
+            test_logger = Logger(logdir + "/test")
             sess.run(test_init_op)
             batches = 0
             test_loss = 0
             while True:
                 try:
-                    lss, acc = sess.run([loss, accuracy])
+                    lss, acc, images = sess.run([loss, accuracy, next_features])
                     test_loss += lss
                     batches += 1
                     if batches % 50 == 0:
@@ -83,6 +84,7 @@ def spawn_network(args):
                 except tf.errors.OutOfRangeError:
                     break
             assert batches is not 0, "NO TEST DATA PASSED"
+            test_logger.log_image(tag="testing_image", images=images, step=0, sess=sess)
             test_loss /= batches
             return test_loss
 
@@ -121,25 +123,34 @@ def spawn_network(args):
             epoch = 0
             while epoch < args.n_max_epochs:
                 epoch_loss = 0
+                epoch_acc = 0
                 batches = 0
                 sess.run(training_init_op)
                 while True:
                     try:
                         lss, _, acc = sess.run([loss, optimizer, accuracy])
-                        epoch_loss = epoch_loss + lss
+                        epoch_loss += lss
+                        epoch_acc += acc
                         batches += 1
                         if batches % 50 == 0:
                             print("GPU", args.gpu_id, ": Batch", batches, "done.")
                     except tf.errors.OutOfRangeError:
                         break
                 epoch_loss /= batches
+                epoch_acc /= batches
                 training_logger.log_scalar("epoch_training_loss", epoch_loss, epoch)
-                print("Epoch", epoch, "on GPU", args.gpu_id, "- Training loss was:", epoch_loss)
+                training_logger.log_scalar("epoch_training_acc", epoch_acc, epoch)
+                print("Epoch", epoch, "on GPU", args.gpu_id, "- Training loss was:", epoch_loss,
+                      "- Accuracy was:", epoch_acc)
                 if epoch % 3 == 1:
                     eval_loss = evaluate_performance(epoch)
-                    eval_losses.append(eval_loss)
                     print("Epoch", epoch, "on GPU", args.gpu_id, "- Evaluation loss was:", eval_loss)
-                    if len(list([ls < eval_loss for ls in eval_losses])) > 5:
+                    eval_losses.append(eval_loss)
+                    n_better_setups = 0
+                    for stored_lss in eval_losses:
+                        if stored_lss < eval_loss:
+                            n_better_setups += 1
+                    if n_better_setups > 2:
                         print("evaluation error has been increasing again.")
                         break
                 epoch += 1

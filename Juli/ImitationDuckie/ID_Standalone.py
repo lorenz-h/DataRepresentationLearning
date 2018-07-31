@@ -8,6 +8,6 @@ This runs the network testing, just using the default hyperparameters in ID_Opti
 args = ParameterBatch()
 args.gpu_id = check_available_gpus()[0]
 args.training = False
-args.n_max_epochs = 30
-acc = setup_thread_environment(args)
-print(acc)
+args.n_max_epochs = 19
+akk = setup_thread_environment(args)
+print(akk)
