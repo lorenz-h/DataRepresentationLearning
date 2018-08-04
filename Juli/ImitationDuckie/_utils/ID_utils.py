@@ -162,7 +162,7 @@ class ParameterBatch:
                  n_max_epochs=30,
                  n_runs=1,
                  training=True,
-                 train_csv_file="_data/hetzell_shearlet_training_data.csv",
+                 train_csv_file="_data/hetzell_shearlet_evaluation_data.csv",
                  eval_csv_file="_data/hetzell_shearlet_evaluation_data.csv",
                  test_csv_file="_data/hetzell_shearlet_testing_data.csv"
                  ):

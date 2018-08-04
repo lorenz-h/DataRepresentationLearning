@@ -39,13 +39,13 @@ def tt(gpu):
     global n_points
     print("Started Thread", gpu)
     while True:
-        params = queue.get()
+        params = map_val_to_param_batch(queue.get())
         params.gpu_id = gpu
         lss = setup_thread_environment(params)
         with lock:
             print(params)
-            optimizer.tell([params], lss)
-            new_point = map_val_to_param_batch(optimizer.ask())
+            optimizer.tell(params, lss)
+            new_point = optimizer.ask()
         queue.put(new_point)
         print(gpu, ":", params)
         with lock:
@@ -57,12 +57,14 @@ def tt(gpu):
 def spawn_threads():
     command_str = "(rm -r _logs)"
     subprocess.run(command_str, shell=True)
+    command_str = "(rm -r nohup.out)"
+    subprocess.run(command_str, shell=True)
     start_time = time.time()
     reserved_gpus = check_available_gpus()
     print(Colors.OKGREEN, "GPUs", reserved_gpus, "are available.", Colors.ENDC)
     p = mp.Pool(len(reserved_gpus))
     for i in range(len(reserved_gpus)+1):
-        queue.put(map_val_to_param_batch(optimizer.ask()))
+        queue.put(optimizer.ask())
     p.map(tt, reserved_gpus)
     p.close()
     print("All Threads finished.")
