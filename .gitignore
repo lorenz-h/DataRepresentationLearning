@@ -1,7 +1,8 @@
 /.idea
 logs/
 _logs/
-_logs_raw_data/
+_logs_raw/
+_logs_shearlets/
 _cache/
 Dataset/
 Dataset2/

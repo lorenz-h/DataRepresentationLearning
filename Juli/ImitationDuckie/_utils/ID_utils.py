@@ -146,3 +146,37 @@ def grayscale(array):
     assert array.ndim == 3
     array = np.mean(array, 2)
     return array
+
+
+class ParameterBatch:
+    """
+    Class of Object containing all hyperparameters needed to run the network.
+    """
+    def __init__(self,
+                 learning_rate=0.0005,
+                 input_shape=[480, 640, 1],
+                 batch_size=16,
+                 convolutions=[(64, 7, 7), (128, 5, 5)],
+                 gpu_id=2,
+                 n_dense_nodes=128,
+                 n_max_epochs=30,
+                 n_runs=1,
+                 training=True,
+                 train_csv_file="_data/hetzell_shearlet_training_data.csv",
+                 eval_csv_file="_data/hetzell_shearlet_evaluation_data.csv",
+                 test_csv_file="_data/hetzell_shearlet_testing_data.csv"
+                 ):
+        self.learning_rate = learning_rate
+        self.input_shape = input_shape
+        self.batch_size = batch_size
+        self.convolutions = convolutions
+        self.gpu_id = gpu_id
+        self.n_dense_nodes = n_dense_nodes
+        self.n_max_epochs = n_max_epochs
+        self.n_runs = n_runs
+        self.training = training
+        self.train_csv_file = train_csv_file
+        self.test_csv_file = test_csv_file
+        self.eval_csv_file = eval_csv_file
+
+

@@ -1,5 +1,10 @@
-import skopt.plots
-import pickle
+from multiprocessing import Pool
 
-results = pickle.load(open("../_logs/optimizer_points.pkl", "rb"))
-skopt.plots.plot_regret(results)
+
+def f(x):
+    return x*x
+
+
+if __name__ == '__main__':
+    p = Pool(5)
+    print(p.map(f, [1, 2, 3]))

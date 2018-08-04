@@ -62,7 +62,7 @@ def spawn_network(args):
     optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate).minimize(loss)
 
     with tf.Session() as sess:
-
+        tf.RunOptions(report_tensor_allocations_upon_oom=True),
         sess.run(tf.global_variables_initializer())
 
         def test_performance():
