@@ -4,6 +4,7 @@ import tensorflow as tf
 import os
 import numpy as np
 from os import listdir
+import multiprocessing as mp
 
 
 class Colors:
@@ -162,7 +163,7 @@ class ParameterBatch:
                  n_max_epochs=30,
                  n_runs=1,
                  training=True,
-                 train_csv_file="_data/hetzell_shearlet_evaluation_data.csv",
+                 train_csv_file="_data/hetzell_shearlet_training_data.csv",
                  eval_csv_file="_data/hetzell_shearlet_evaluation_data.csv",
                  test_csv_file="_data/hetzell_shearlet_testing_data.csv"
                  ):
@@ -180,3 +181,26 @@ class ParameterBatch:
         self.eval_csv_file = eval_csv_file
 
 
+class ThreadSaveCounter:
+    def __init__(self, initial=0, maxvalue=None):
+        """Initialize a new atomic counter to given initial value (default 0)."""
+        self.value = initial
+        self._lock = mp.Lock()
+        self.maxValue = maxvalue
+
+    def increment(self, num=1):
+        """Atomically increment the counter by num (default 1) and return the
+        new value.
+        """
+        with self._lock:
+            self.value += num
+            return self.value
+
+    def reached_upper_limit(self):
+        if self.maxValue is not None:
+            if self.value > self.maxValue:
+                return True
+            else:
+                return False
+        else:
+            return False

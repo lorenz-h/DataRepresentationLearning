@@ -1,11 +1,10 @@
-from queue import Queue
 import time
 from skopt import Optimizer
 from skopt.space import Real, Integer
 import pickle
 import multiprocessing as mp
 from ID_CNN_V01 import setup_thread_environment
-from _utils.ID_utils import get_convolutions, Colors, check_available_gpus, ParameterBatch
+from _utils.ID_utils import get_convolutions, Colors, check_available_gpus, ParameterBatch, ThreadSaveCounter
 import subprocess
 
 dim_learning_rate = Real(low=1e-7, high=3e-2, prior='log-uniform', name='learning_rate')
@@ -15,8 +14,8 @@ dim_dense_nodes = Integer(low=128, high=200, name='n_dense_nodes')
 
 queue = mp.Queue()
 
-n_points = 0
-max_n_points = 20
+
+n_points = ThreadSaveCounter(maxvalue=15)
 
 lock = mp.Lock()
 optimizer = Optimizer(dimensions=[dim_learning_rate, dim_n_convolutions, dim_dense_nodes], random_state=1)
@@ -36,25 +35,35 @@ def map_val_to_param_batch(vals):
 
 
 def tt(gpu):
-    global n_points
+    """
+    This is one thread. It will take a point from the queue, evaluate it and tell the optimizer the result.
+    It will then ask the optimizer for a new point and append it to the queue. It will exit once a certain number of
+    points has been evaluated.
+    :param gpu: The GPU ID the thread should use
+    :return: ---
+    """
     print("Started Thread", gpu)
     while True:
-        params = map_val_to_param_batch(queue.get())
+        point = queue.get()
+        params = map_val_to_param_batch(point)
         params.gpu_id = gpu
         lss = setup_thread_environment(params)
         with lock:
-            print(params)
-            optimizer.tell(params, lss)
+            optimizer.tell(point, lss)
             new_point = optimizer.ask()
+            n_points.increment()
         queue.put(new_point)
-        print(gpu, ":", params)
-        with lock:
-            n_points += 1
-        if n_points > max_n_points:
+        print(Colors.WARNING, gpu, ": Sucessfully Investigated", point, Colors.ENDC)
+        if n_points.reached_upper_limit():
             break
 
 
 def spawn_threads():
+    """
+    This will look for available gpus and then spawn a process tt for each of the free gpus. After the optimization
+    is complete it will test the best setup found and save the results.
+    :return: ---
+    """
     command_str = "(rm -r _logs)"
     subprocess.run(command_str, shell=True)
     command_str = "(rm -r nohup.out)"

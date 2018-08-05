@@ -98,10 +98,12 @@ def spawn_network(args):
             evaluation_logger = Logger(logdir + "/eval")
             batches = 0
             ev_loss = 0
+            ev_acc = 0
             while True:
                 try:
                     lss, acc = sess.run([loss, accuracy])
                     ev_loss = ev_loss + lss
+                    ev_acc = ev_acc + acc
                     batches += 1
                     if batches % 50 == 0:
                         print("GPU", args.gpu_id, ": Evaluation batch", batches, "done.")
@@ -109,8 +111,9 @@ def spawn_network(args):
                     break
             assert batches is not 0, "NO EVALUATION DATA PASSED"
             ev_loss /= batches
+            ev_acc /= batches
             evaluation_logger.log_scalar("evaluation_loss", ev_loss, ep)
-            return ev_loss
+            return ev_loss, ev_acc
 
         def training():
             """
@@ -132,7 +135,7 @@ def spawn_network(args):
                         epoch_loss += lss
                         epoch_acc += acc
                         batches += 1
-                        if batches % 50 == 0:
+                        if batches % 200 == 0:
                             print("GPU", args.gpu_id, ": Batch", batches, "done.")
                     except tf.errors.OutOfRangeError:
                         break
@@ -143,7 +146,7 @@ def spawn_network(args):
                 print("Epoch", epoch, "on GPU", args.gpu_id, "- Training loss was:", epoch_loss,
                       "- Accuracy was:", epoch_acc)
                 if epoch % 3 == 1:
-                    eval_loss = evaluate_performance(epoch)
+                    eval_loss, eval_acc = evaluate_performance(epoch)
                     print("Epoch", epoch, "on GPU", args.gpu_id, "- Evaluation loss was:", eval_loss)
                     eval_losses.append(eval_loss)
                     n_better_setups = 0
@@ -153,6 +156,9 @@ def spawn_network(args):
                     if n_better_setups > 2:
                         print("evaluation error has been increasing again.")
                         break
+                    if epoch > int(args.n_max_epochs / 2):
+                        if eval_acc < 0.1:
+                            break
                 epoch += 1
             smallest_eval_loss = sorted(eval_losses)[0]
             return smallest_eval_loss
