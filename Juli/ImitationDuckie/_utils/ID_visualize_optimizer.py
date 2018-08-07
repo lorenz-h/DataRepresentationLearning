@@ -4,7 +4,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
 
-setups = pickle.load(open("../_logs_raw/optimizer_points.pkl", "rb"))
+setups = pickle.load(open("../_saved_logs/_logs_raw/optimizer_points.pkl", "rb"))
 results, points = zip(*setups)
 learning_rate, n_convolutions, n_dense_nodes = zip(*points)
 results = np.clip(results, 0.0, 1.0)

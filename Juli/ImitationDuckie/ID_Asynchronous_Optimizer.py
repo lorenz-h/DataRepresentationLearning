@@ -1,10 +1,10 @@
 import time
-from skopt import Optimizer
 from skopt.space import Real, Integer
 import pickle
 import multiprocessing as mp
 from ID_CNN_V01 import setup_thread_environment
 from _utils.ID_utils import get_convolutions, Colors, check_available_gpus, ParameterBatch, ThreadSaveCounter
+from _utils.ID_utils import LoggableOptimizer
 import subprocess
 
 dim_learning_rate = Real(low=1e-7, high=3e-2, prior='log-uniform', name='learning_rate')
@@ -15,10 +15,10 @@ dim_dense_nodes = Integer(low=128, high=200, name='n_dense_nodes')
 queue = mp.Queue()
 
 
-n_points = ThreadSaveCounter(maxvalue=15)
+n_points = ThreadSaveCounter(maxvalue=10)
 
 lock = mp.Lock()
-optimizer = Optimizer(dimensions=[dim_learning_rate, dim_n_convolutions, dim_dense_nodes], random_state=1)
+optimizer = LoggableOptimizer(dimensions=[dim_learning_rate, dim_n_convolutions, dim_dense_nodes], random_state=1)
 
 
 def map_val_to_param_batch(vals):
@@ -50,6 +50,7 @@ def tt(gpu):
         lss = setup_thread_environment(params)
         with lock:
             optimizer.tell(point, lss)
+            optimizer.log_state()
             new_point = optimizer.ask()
             n_points.increment()
         queue.put(new_point)
@@ -66,10 +67,10 @@ def spawn_threads():
     """
     command_str = "(rm -r _logs)"
     subprocess.run(command_str, shell=True)
-    command_str = "(rm -r nohup.out)"
-    subprocess.run(command_str, shell=True)
     start_time = time.time()
     reserved_gpus = check_available_gpus()
+    reserved_gpus.pop(0)
+    reserved_gpus.pop(0)
     print(Colors.OKGREEN, "GPUs", reserved_gpus, "are available.", Colors.ENDC)
     p = mp.Pool(len(reserved_gpus))
     for i in range(len(reserved_gpus)+1):
@@ -107,3 +108,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

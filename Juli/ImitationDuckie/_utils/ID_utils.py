@@ -5,6 +5,8 @@ import os
 import numpy as np
 from os import listdir
 import multiprocessing as mp
+import csv
+import skopt
 
 
 class Colors:
@@ -183,7 +185,7 @@ class ParameterBatch:
 
 class ThreadSaveCounter:
     def __init__(self, initial=0, maxvalue=None):
-        """Initialize a new atomic counter to given initial value (default 0)."""
+        """Initialize a new thread save counter to given initial value (default 0)."""
         self.value = initial
         self._lock = mp.Lock()
         self.maxValue = maxvalue
@@ -204,3 +206,25 @@ class ThreadSaveCounter:
                 return False
         else:
             return False
+
+
+class LoggableOptimizer(skopt.Optimizer):
+    """
+    This class inherits from the skopt Optimizer class. All it does is add logging functionality.
+    """
+    def __init__(self, dimensions, random_state, csv_file='_logs/optimizer_log.csv', logging=True):
+        skopt.Optimizer.__init__(self, dimensions=dimensions, random_state=random_state)
+        self._lock = mp.Lock()
+        self.logging = logging
+        self.log_file = csv_file
+
+    def log_state(self):
+        with self._lock:
+            results = list(zip(self.yi, self.Xi))
+            with open(self.log_file, 'w') as file:
+                writer = csv.writer(file)
+                for row in results:
+                    writer.writerow(row)
+
+
+
