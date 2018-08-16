@@ -18,3 +18,4 @@ cifar-10-batches-py/
 *.npy
 *.pkl
 *.csv
+__pycache__/
