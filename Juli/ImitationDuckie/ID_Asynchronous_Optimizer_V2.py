@@ -1,15 +1,15 @@
 import time
-from skopt.space import Real, Integer
+from skopt.space import Real, Integer, Categorical
 import multiprocessing as mp
 from ID_CNN_V01 import setup_thread_environment
-from _utils.ID_utils import get_convolutions, Colors, check_available_gpus, ParameterBatch, LoggableOptimizer
+from _utils.ID_utils import get_convolutions, c_print, check_available_gpus, ParameterBatch, LoggableOptimizer
 import subprocess
 
 dim_learning_rate = Real(low=1e-9, high=3e-1, prior='log-uniform', name='learning_rate')
-dim_n_convolutions = Integer(low=1, high=3, name='n_convolutions')
-dim_dense_nodes = Integer(low=128, high=200, name='n_dense_nodes')
-
-max_n_points = 70
+dim_n_convolutions = Integer(low=0, high=5, name='n_convolutions')
+dim_dense_nodes = Integer(low=128, high=512, name='n_dense_nodes')
+dim_activation = Categorical(categories=['relu', 'sigmoid', 'tanh', 'None'])
+max_n_points = 60
 queue = mp.Queue()
 lock = mp.Lock()
 
@@ -27,6 +27,11 @@ def map_val_to_param_batch(vals):
 
 
 def child(gpu, child_node):
+    """
+    :param gpu: The GPU the child should use.
+    :param child_node: the pipeline endpoint through which the child will send and recieve information to the server
+    :return: ---
+    """
     print("Started Child", gpu)
     while True:
         if queue.empty():
@@ -37,17 +42,25 @@ def child(gpu, child_node):
         lss = setup_thread_environment(params)
         with lock:
             child_node.send([point, lss])
-        print(Colors.WARNING, "GPU", gpu, ": Sucessfully Investigated", point, Colors.ENDC)
+        c_print("GPU", gpu, ": Sucessfully Investigated", point, color="red")
         time.sleep(1)  # so that the server_process has enough time to enqueue a new point
-    print(Colors.WARNING, "Child", gpu, "exited.", Colors.ENDC)
+    c_print("Child", gpu, "exited.", color="red")
 
 
 def server_process():
+    """
+    Create a new Optimizer, Create Queue for Values to be investigated by Optimizer.
+    Spawn subprocesses (children) listen for their results enqueue new points until max_n_points is reached.
+    Exit the loop when all children have terminated.
+    :return: ---
+    """
     command_str = "(rm -r _logs)"
     subprocess.run(command_str, shell=True)
     optimizer = LoggableOptimizer(dimensions=[dim_learning_rate, dim_n_convolutions, dim_dense_nodes], random_state=1)
     parent_node, child_node = mp.Pipe()
     reserved_gpus = check_available_gpus()
+    reserved_gpus.pop(0)
+    reserved_gpus.pop(0)
     for i in range(len(reserved_gpus)+2):
         queue.put(optimizer.ask())
     processes = []
@@ -66,20 +79,20 @@ def server_process():
         if not children_busy:
             break
         msg = parent_node.recv()  # waits to recieve a message from one of the children
-        print(Colors.OKGREEN, "Server Recieved info about", msg[0], msg[1], Colors.ENDC)
+        c_print("Server Recieved info about", msg[0], msg[1], color='green')
         optimizer.tell(msg[0], msg[1])
         optimizer.log_state()
         i += 1
         if i < max_n_points:
             queue.put(optimizer.ask())
-            print(Colors.OKGREEN, "Generated new point", Colors.ENDC)
+            c_print("Generated new Point", color='green')
 
     for p in processes:
         p.join()
 
     sorted_sets = sorted(list(zip(optimizer.yi, optimizer.Xi)), key=lambda tup: tup[0])
-    print(Colors.OKBLUE, "Finished Optimization. Best Set:", sorted_sets[0], Colors.ENDC)
-    print(Colors.OKBLUE, "Results have been stored. Commencing Testing...", Colors.ENDC)
+    c_print("Finished Optimization. Best Set:", sorted_sets[0], color="blue")
+    c_print("Results have been stored. Commencing Testing...", color="blue")
     test_args = map_val_to_param_batch(sorted_sets[0][1])
     test_args.training = False
     test_args.gpu_id = reserved_gpus[0]
@@ -90,7 +103,7 @@ def server_process():
         file.write(str(avg_test_accuracy)+"\n")
         file.write("With Setup" + "\n")
         file.write(str(sorted_sets[0][1]))
-    print(Colors.OKBLUE, "Finished Testing. Server is Shutting Down", Colors.ENDC)
+    c_print("Finished Testing. Server is Shutting Down", color="blue")
 
 
 def main():

@@ -3,6 +3,7 @@ logs/
 _logs/
 _logs_raw/
 _logs_shearlets/
+_saved_logs/
 _cache/
 Dataset/
 Dataset2/

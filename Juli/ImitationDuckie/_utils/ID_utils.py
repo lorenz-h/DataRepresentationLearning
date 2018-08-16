@@ -9,17 +9,6 @@ import csv
 import skopt
 
 
-class Colors:
-    """
-    used to color terminal output for better legibility.
-    """
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[32m'
-    WARNING = '\033[31m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-
-
 def check_available_gpus():
     """
     This function runs nvidia-smi --id=gpu and captures the output. If it finds that there are no jobs running on a
@@ -58,6 +47,7 @@ class Logger(object):
     def __init__(self, log_dir):
         """Creates a summary writer logging to log_dir."""
         self.writer = tf.summary.FileWriter(log_dir)
+        self.writer.add_graph(tf.get_default_graph())
 
     def log_scalar(self, tag, value, step):
         """
@@ -157,17 +147,17 @@ class ParameterBatch:
     """
     def __init__(self,
                  learning_rate=0.0005,
-                 input_shape=[480, 640, 1],
-                 batch_size=16,
+                 input_shape=[160, 120, 1],
+                 batch_size=24,
                  convolutions=[(64, 7, 7), (128, 5, 5)],
                  gpu_id=2,
                  n_dense_nodes=128,
                  n_max_epochs=30,
                  n_runs=1,
                  training=True,
-                 train_csv_file="_data/hetzell_shearlet_training_data.csv",
-                 eval_csv_file="_data/hetzell_shearlet_evaluation_data.csv",
-                 test_csv_file="_data/hetzell_shearlet_testing_data.csv"
+                 train_csv_file="_data/hetzell_dct_training_data.csv",
+                 eval_csv_file="_data/hetzell_dct_evaluation_data.csv",
+                 test_csv_file="_data/hetzell_dct_testing_data.csv"
                  ):
         self.learning_rate = learning_rate
         self.input_shape = input_shape
@@ -181,6 +171,53 @@ class ParameterBatch:
         self.train_csv_file = train_csv_file
         self.test_csv_file = test_csv_file
         self.eval_csv_file = eval_csv_file
+
+
+class LoggableOptimizer(skopt.Optimizer):
+    """
+    This class inherits from the skopt Optimizer class. All it does is add logging functionality.
+    """
+    def __init__(self, dimensions, random_state, csv_file='_logs/optimizer_log.csv', logging=True):
+        skopt.Optimizer.__init__(self, dimensions=dimensions, random_state=random_state)
+        self._lock = mp.Lock()
+        self.logging = logging
+        self.log_file = csv_file
+
+    def log_state(self):
+        with self._lock:
+            results = list(zip(self.yi, self.Xi))
+            with open(self.log_file, 'w') as file:
+                writer = csv.writer(file)
+                for row in results:
+                    writer.writerow(row)
+
+
+def c_print(*string, color=None):
+    print_string = ""
+    for st in string:
+        print_string += " " + str(st)
+    end_color = '\033[0m'
+    colors = {'blue': '\033[94m', 'green': '\033[32m', 'red': '\033[31m'}
+    assert color in colors, print("Argument", color,
+                                  "not allowed. Allowed codes are:", [key for key, _ in colors.items()])
+    print(colors.get(color), print_string, end_color)
+
+
+# ########################LEGACY_CODE###################################################
+"""
+This code is not used in the final versions and only preserved to ensure compatibility with older versions
+"""
+
+
+class Colors:
+    """
+    used to color terminal output for better legibility.
+    """
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[32m'
+    WARNING = '\033[31m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
 
 
 class ThreadSaveCounter:
@@ -206,25 +243,3 @@ class ThreadSaveCounter:
                 return False
         else:
             return False
-
-
-class LoggableOptimizer(skopt.Optimizer):
-    """
-    This class inherits from the skopt Optimizer class. All it does is add logging functionality.
-    """
-    def __init__(self, dimensions, random_state, csv_file='_logs/optimizer_log.csv', logging=True):
-        skopt.Optimizer.__init__(self, dimensions=dimensions, random_state=random_state)
-        self._lock = mp.Lock()
-        self.logging = logging
-        self.log_file = csv_file
-
-    def log_state(self):
-        with self._lock:
-            results = list(zip(self.yi, self.Xi))
-            with open(self.log_file, 'w') as file:
-                writer = csv.writer(file)
-                for row in results:
-                    writer.writerow(row)
-
-
-

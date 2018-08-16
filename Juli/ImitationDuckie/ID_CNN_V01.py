@@ -1,8 +1,21 @@
 import tensorflow as tf
 import os
+import subprocess
 
-from _utils.ID_utils import Logger
+from _utils.ID_utils import Logger, ParameterBatch
 from ID_Input_Pipeline import create_dataset
+
+
+def conv_layer(input_arr, conv):
+    cnv = tf.layers.conv2d(
+        inputs=input_arr,
+        filters=conv[0],
+        kernel_size=[conv[1], conv[2]],
+        padding="same",
+        activation=tf.nn.relu,
+        name="conv"+str(conv[0]))
+    new_input_arr = tf.layers.max_pooling2d(inputs=cnv, pool_size=[3, 3], strides=2, name=str(conv[0])+"flat")
+    return new_input_arr
 
 
 def cnn(x, args):
@@ -15,15 +28,13 @@ def cnn(x, args):
     """
     input_layer = tf.reshape(x, [-1, args.input_shape[0], args.input_shape[1], args.input_shape[2]])
     input_arr = input_layer
+
     for conv in args.convolutions:
-        cnv = tf.layers.conv2d(
-            inputs=input_arr,
-            filters=conv[0],
-            kernel_size=[conv[1], conv[2]],
-            padding="same",
-            activation=tf.nn.relu)
-        input_arr = tf.layers.max_pooling2d(inputs=cnv, pool_size=[3, 3], strides=2)
-    pool2_flat = tf.layers.flatten(input_arr)
+        input_arr = conv_layer(input_arr, conv)
+    if len(args.convolutions) < 1:
+        if args.input_shape[0]*args.input_shape[1] > 300000:
+            input_arr = tf.layers.max_pooling2d(inputs=input_arr, pool_size=[4, 4], strides=2, name="reduce_size")
+    pool2_flat = tf.layers.flatten(input_arr, name="FlattenBeforeDense")
     dense = tf.layers.dense(inputs=pool2_flat, units=args.n_dense_nodes, activation=tf.nn.relu)
     dense_2 = tf.layers.dense(inputs=dense, units=int(args.n_dense_nodes/2), activation=tf.nn.relu)
     out = tf.layers.dense(inputs=dense_2, units=1, activation=None)
@@ -164,7 +175,7 @@ def spawn_network(args):
             return smallest_eval_loss
 
         experiment_logdir = "gpu" + str(args.batch_size) + "_" + str(args.learning_rate) + \
-                            str(args.n_dense_nodes) + "_" + str(args.gpu_id)
+                            str(args.n_dense_nodes) + "_" + str(len(args.convolutions))
         logdir = os.path.join("_logs", experiment_logdir)
         if args.training:
             return training()
@@ -191,4 +202,14 @@ def setup_thread_environment(args):
     acc = acc / args.n_runs
     return acc
 
+
+def main():
+    command_str = "(rm -r _logs)"
+    subprocess.run(command_str, shell=True)
+    params = ParameterBatch(gpu_id=0, training=False)
+    setup_thread_environment(params)
+
+
+if __name__ == "__main__":
+    main()
 
