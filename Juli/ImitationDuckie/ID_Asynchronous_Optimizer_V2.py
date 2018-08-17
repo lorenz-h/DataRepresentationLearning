@@ -9,7 +9,7 @@ dim_learning_rate = Real(low=1e-9, high=3e-1, prior='log-uniform', name='learnin
 dim_n_convolutions = Integer(low=0, high=5, name='n_convolutions')
 dim_dense_nodes = Integer(low=128, high=512, name='n_dense_nodes')
 dim_activation = Categorical(categories=['relu', 'sigmoid', 'tanh', 'None'])
-max_n_points = 60
+max_n_points = 100
 queue = mp.Queue()
 lock = mp.Lock()
 
@@ -59,8 +59,6 @@ def server_process():
     optimizer = LoggableOptimizer(dimensions=[dim_learning_rate, dim_n_convolutions, dim_dense_nodes], random_state=1)
     parent_node, child_node = mp.Pipe()
     reserved_gpus = check_available_gpus()
-    reserved_gpus.pop(0)
-    reserved_gpus.pop(0)
     for i in range(len(reserved_gpus)+2):
         queue.put(optimizer.ask())
     processes = []

@@ -187,9 +187,15 @@ class LoggableOptimizer(skopt.Optimizer):
         with self._lock:
             results = list(zip(self.yi, self.Xi))
             with open(self.log_file, 'w') as file:
-                writer = csv.writer(file)
+                writer = csv.writer(file, delimiter=';')
                 for row in results:
-                    writer.writerow(row)
+                    to_print = []
+                    result = row[0]
+                    setup = row[1]
+                    to_print.append(result)
+                    for param in setup:
+                        to_print.append(param)
+                    writer.writerow(to_print)
 
 
 def c_print(*string, color=None):

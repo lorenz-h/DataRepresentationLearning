@@ -2,7 +2,7 @@ import tensorflow as tf
 import os
 import subprocess
 
-from _utils.ID_utils import Logger, ParameterBatch
+from _utils.ID_utils import Logger, ParameterBatch, c_print
 from ID_Input_Pipeline import create_dataset
 
 
@@ -204,6 +204,7 @@ def setup_thread_environment(args):
 
 
 def main():
+    c_print("Running Standalone Version using default parameters.", color="blue")
     command_str = "(rm -r _logs)"
     subprocess.run(command_str, shell=True)
     params = ParameterBatch(gpu_id=0, training=False)
