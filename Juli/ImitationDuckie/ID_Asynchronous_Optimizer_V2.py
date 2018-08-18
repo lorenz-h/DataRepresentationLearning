@@ -4,10 +4,11 @@ import multiprocessing as mp
 from ID_CNN_V01 import setup_thread_environment
 from _utils.ID_utils import get_convolutions, c_print, check_available_gpus, ParameterBatch, LoggableOptimizer
 import subprocess
+import tensorflow as tf
 
-dim_learning_rate = Real(low=1e-9, high=3e-1, prior='log-uniform', name='learning_rate')
-dim_n_convolutions = Integer(low=0, high=5, name='n_convolutions')
-dim_dense_nodes = Integer(low=128, high=512, name='n_dense_nodes')
+dim_learning_rate = Real(low=1e-10, high=3e-1, prior='log-uniform', name='learning_rate')
+dim_n_convolutions = Integer(low=3, high=5, name='n_convolutions')
+dim_dense_nodes = Integer(low=300, high=512, name='n_dense_nodes')
 dim_activation = Categorical(categories=['relu', 'sigmoid', 'tanh', 'None'])
 max_n_points = 100
 queue = mp.Queue()
@@ -32,19 +33,22 @@ def child(gpu, child_node):
     :param child_node: the pipeline endpoint through which the child will send and recieve information to the server
     :return: ---
     """
-    print("Started Child", gpu)
-    while True:
-        if queue.empty():
-            break
-        point = queue.get()
-        params = map_val_to_param_batch(point)
-        params.gpu_id = gpu
-        lss = setup_thread_environment(params)
-        with lock:
+    try:
+        print("Started Child", gpu)
+        while True:
+            if queue.empty():
+                break
+            point = queue.get()
+            params = map_val_to_param_batch(point)
+            params.gpu_id = gpu
+            lss = setup_thread_environment(params)
             child_node.send([point, lss])
-        c_print("GPU", gpu, ": Sucessfully Investigated", point, color="red")
-        time.sleep(1)  # so that the server_process has enough time to enqueue a new point
-    c_print("Child", gpu, "exited.", color="red")
+            c_print("GPU", gpu, ": Sucessfully Investigated", point, color="red")
+            time.sleep(1)  # so that the server_process has enough time to enqueue a new point
+        c_print("Child", gpu, "exited.", color="red")
+    except tf.errors.ResourceExhaustedError:
+        child_node.send([point, 0.09])
+        child_node.send([gpu, "crashed"])
 
 
 def server_process():
@@ -70,13 +74,23 @@ def server_process():
 
     while True:
         time.sleep(3)
-        children_busy = False
-        for p in processes:
+        """
+                children_busy = False
+                for p in processes:
             if p.is_alive():
                 children_busy = True
         if not children_busy:
             break
+        """
         msg = parent_node.recv()  # waits to recieve a message from one of the children
+        c_print(msg, color="blues")
+        if msg[1] is "crashed":
+            if not queue.empty():
+                c_print("Launching new child on gpu", msg[0], color="blue")
+                p = mp.Process(target=child, args=(msg[0], child_node))
+                p.start()
+                processes.append(p)
+
         c_print("Server Recieved info about", msg[0], msg[1], color='green')
         optimizer.tell(msg[0], msg[1])
         optimizer.log_state()

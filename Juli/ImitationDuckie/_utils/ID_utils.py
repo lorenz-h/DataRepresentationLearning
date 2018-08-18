@@ -152,7 +152,7 @@ class ParameterBatch:
                  convolutions=[(64, 7, 7), (128, 5, 5)],
                  gpu_id=2,
                  n_dense_nodes=128,
-                 n_max_epochs=30,
+                 n_max_epochs=10,
                  n_runs=1,
                  training=True,
                  train_csv_file="_data/hetzell_dct_training_data.csv",

@@ -15,7 +15,7 @@ def generate_2d_scatterplot(y, x, y_label, x_label, x_scale="linear", y_scale="l
     plt.show()
 
 
-def generate_4d_scatterplot(a, b , c, d):
+def generate_4d_scatterplot(a, b, c, d):
     dpi = 320
     plt.figure(figsize=(2000 / dpi, 1500 / dpi), dpi=dpi)
     sizes = [item*50 for item in d]

@@ -5,6 +5,7 @@ import subprocess
 from _utils.ID_utils import Logger, ParameterBatch, c_print
 from ID_Input_Pipeline import create_dataset
 
+import logging
 
 def conv_layer(input_arr, conv):
     cnv = tf.layers.conv2d(
@@ -154,8 +155,6 @@ def spawn_network(args):
                 epoch_acc /= batches
                 training_logger.log_scalar("epoch_training_loss", epoch_loss, epoch)
                 training_logger.log_scalar("epoch_training_acc", epoch_acc, epoch)
-                print("Epoch", epoch, "on GPU", args.gpu_id, "- Training loss was:", epoch_loss,
-                      "- Accuracy was:", epoch_acc)
                 if epoch % 3 == 1:
                     eval_loss, eval_acc = evaluate_performance(epoch)
                     print("Epoch", epoch, "on GPU", args.gpu_id, "- Evaluation loss was:", eval_loss)
