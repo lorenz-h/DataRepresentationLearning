@@ -12,7 +12,7 @@ dim_learning_rate = Real(low=1e-10, high=3e-1, prior='log-uniform', name='learni
 dim_n_convolutions = Integer(low=0, high=5, name='n_convolutions')
 dim_dense_nodes = Integer(low=128, high=650, name='n_dense_nodes')
 dim_activation = Categorical(categories=['relu', 'sigmoid', 'tanh', 'None'])
-max_n_points = 15
+max_n_points = 90
 queue = mp.Queue()
 lock = mp.Lock()
 
