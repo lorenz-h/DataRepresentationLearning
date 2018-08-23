@@ -5,7 +5,6 @@ import subprocess
 from _utils.ID_utils import Logger, ParameterBatch, c_print
 from ID_Input_Pipeline import create_dataset
 
-import logging
 
 def conv_layer(input_arr, conv):
     cnv = tf.layers.conv2d(
@@ -72,7 +71,7 @@ def spawn_network(args):
     accuracy = tf.divide((static_approx_error - loss), static_approx_error)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate).minimize(loss)
-
+    args.logger.put("Child Graph" + str(args.gpu_id) + " has been built.")
     with tf.Session() as sess:
         tf.RunOptions(report_tensor_allocations_upon_oom=True),
         sess.run(tf.global_variables_initializer())
@@ -92,7 +91,7 @@ def spawn_network(args):
                     test_loss += lss
                     batches += 1
                     if batches % 50 == 0:
-                        print("GPU", args.gpu_id, ": Testbatch", batches, "done.")
+                        print("GPU" + str(args.gpu_id) + ": Testbatch" + str(batches) + "done.")
                 except tf.errors.OutOfRangeError:
                     break
             assert batches is not 0, "NO TEST DATA PASSED"
@@ -117,8 +116,6 @@ def spawn_network(args):
                     ev_loss = ev_loss + lss
                     ev_acc = ev_acc + acc
                     batches += 1
-                    if batches % 50 == 0:
-                        print("GPU", args.gpu_id, ": Evaluation batch", batches, "done.")
                 except tf.errors.OutOfRangeError:
                     break
             assert batches is not 0, "NO EVALUATION DATA PASSED"
@@ -147,8 +144,6 @@ def spawn_network(args):
                         epoch_loss += lss
                         epoch_acc += acc
                         batches += 1
-                        if batches % 200 == 0:
-                            print("GPU", args.gpu_id, ": Batch", batches, "done.")
                     except tf.errors.OutOfRangeError:
                         break
                 epoch_loss /= batches
@@ -157,20 +152,24 @@ def spawn_network(args):
                 training_logger.log_scalar("epoch_training_acc", epoch_acc, epoch)
                 if epoch % 3 == 1:
                     eval_loss, eval_acc = evaluate_performance(epoch)
-                    print("Epoch", epoch, "on GPU", args.gpu_id, "- Evaluation loss was:", eval_loss)
+                    args.logger.put("Epoch" + str(epoch) + "on GPU" +
+                                    str(args.gpu_id) + "- Evaluation loss was:" +
+                                    str(eval_loss))
+                    print()
                     eval_losses.append(eval_loss)
                     n_better_setups = 0
                     for stored_lss in eval_losses:
                         if stored_lss < eval_loss:
                             n_better_setups += 1
                     if n_better_setups > 2:
-                        print("evaluation error has been increasing again.")
+                        print("GPU" + str(args.gpu_id)+" - eval error has been increasing again")
                         break
                     if epoch > int(args.n_max_epochs / 2):
                         if eval_acc < 0.1:
                             break
                 epoch += 1
             smallest_eval_loss = sorted(eval_losses)[0]
+            print("GPU"+str(args.gpu_id)+" - finished training.")
             return smallest_eval_loss
 
         experiment_logdir = "gpu" + str(args.batch_size) + "_" + str(args.learning_rate) + \

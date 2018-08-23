@@ -2,7 +2,7 @@ import csv
 from scipy.misc import imsave, imread
 import numpy as np
 import scipy.fftpack
-destination_folder = "/media/sdb/hetzell/raw_dataset/evaluation/"
+destination_folder = "/media/sdb/hetzell/raw_dataset/training/"
 j_max = 2
 input_shape = [480, 640, 3]
 
@@ -30,7 +30,7 @@ def dct2(image):
     return output
 
 
-with open('../_data/hetzell_evaluation_data.csv', newline='') as csvfile:
+with open('../_data/hetzell_training_data.csv', newline='') as csvfile:
     spamreader = csv.reader(csvfile, delimiter=',', quotechar='|')
     for row in spamreader:
         rows.append(row)
@@ -48,7 +48,7 @@ for row in rows:
     new_row = [row[0], destination_path]
     new_rows.append(new_row)
     i += 1
-with open('../_data/hetzell_raw_evaluation_data.csv', 'w', newline='') as csvfile:
+with open('../_data/hetzell_raw_training_data.csv', 'w', newline='') as csvfile:
     spamwriter = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
     for row in new_rows:
         spamwriter.writerow(row)

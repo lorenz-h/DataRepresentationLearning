@@ -147,17 +147,17 @@ class ParameterBatch:
     """
     def __init__(self,
                  learning_rate=0.0005,
-                 input_shape=[160, 120, 1],
+                 input_shape=[480, 640, 1],
                  batch_size=24,
                  convolutions=[(64, 7, 7), (128, 5, 5)],
                  gpu_id=2,
                  n_dense_nodes=128,
-                 n_max_epochs=10,
-                 n_runs=1,
+                 n_max_epochs=30,
+                 n_runs=2,
                  training=True,
-                 train_csv_file="_data/hetzell_dct_training_data.csv",
-                 eval_csv_file="_data/hetzell_dct_evaluation_data.csv",
-                 test_csv_file="_data/hetzell_dct_testing_data.csv"
+                 train_csv_file="_data/hetzell_training_data.csv",
+                 eval_csv_file="_data/hetzell_evaluation_data.csv",
+                 test_csv_file="_data/hetzell_testing_data.csv"
                  ):
         self.learning_rate = learning_rate
         self.input_shape = input_shape
@@ -171,6 +171,7 @@ class ParameterBatch:
         self.train_csv_file = train_csv_file
         self.test_csv_file = test_csv_file
         self.eval_csv_file = eval_csv_file
+        self.logger = None
 
 
 class LoggableOptimizer(skopt.Optimizer):
@@ -208,6 +209,17 @@ def c_print(*string, color=None):
                                   "not allowed. Allowed codes are:", [key for key, _ in colors.items()])
     print(colors.get(color), print_string, end_color)
 
+
+def map_val_to_param_batch(vals):
+    """
+    Maps the values given by an Optimizer into a ParameterBatch object.
+    :param vals: list of values from Optimizer
+    :return: ParameterBatch object
+    """
+    params = ParameterBatch(learning_rate=vals[0],
+                            convolutions=get_convolutions(vals[1]),
+                            n_dense_nodes=vals[2])
+    return params
 
 # ########################LEGACY_CODE###################################################
 """
