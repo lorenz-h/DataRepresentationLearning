@@ -155,9 +155,9 @@ class ParameterBatch:
                  n_max_epochs=30,
                  n_runs=2,
                  training=True,
-                 train_csv_file="_data/hetzell_training_data.csv",
-                 eval_csv_file="_data/hetzell_evaluation_data.csv",
-                 test_csv_file="_data/hetzell_testing_data.csv"
+                 train_csv_file="_data/hetzell_raw_training_data.csv",
+                 eval_csv_file="_data/hetzell_raw_evaluation_data.csv",
+                 test_csv_file="_data/hetzell_raw_testing_data.csv"
                  ):
         self.learning_rate = learning_rate
         self.input_shape = input_shape

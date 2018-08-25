@@ -155,7 +155,6 @@ def spawn_network(args):
                     args.logger.put("Epoch" + str(epoch) + "on GPU" +
                                     str(args.gpu_id) + "- Evaluation loss was:" +
                                     str(eval_loss))
-                    print()
                     eval_losses.append(eval_loss)
                     n_better_setups = 0
                     for stored_lss in eval_losses:

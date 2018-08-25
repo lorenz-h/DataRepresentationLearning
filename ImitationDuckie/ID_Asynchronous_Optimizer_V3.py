@@ -37,8 +37,8 @@ def logging_process(logger):
 def child_process(gpu, child_node, logger):
     time.sleep(2)
     logger.put("Started Child" + str(gpu))
-    try:
-        while True:
+    while True:
+        try:
                 point = queue.get(block=True, timeout=15)
                 params = map_val_to_param_batch(point)
                 params.gpu_id = gpu
@@ -46,12 +46,12 @@ def child_process(gpu, child_node, logger):
                 lss = setup_thread_environment(params)
                 with lock:
                     child_node.send(["info", point, lss])
-    except tf.errors.ResourceExhaustedError:
-        logger.put("Child" + str(gpu) + "encountered OOM")
-        with lock:
-            child_node.send(["info", point, 2.0])
-    except Empty:
-        logger.put("Child" + str(gpu) + "terminated, because Queue was empty.")
+        except tf.errors.ResourceExhaustedError:
+            logger.put("Child" + str(gpu) + "encountered OOM")
+            with lock:
+                child_node.send(["info", point, 2.0])
+        except Empty:
+            logger.put("Child" + str(gpu) + "terminated, because Queue was empty.")
     with lock:
         child_node.send(["note", gpu, "exited"])
 
@@ -83,11 +83,17 @@ def server_process():
         points_counter += 1
     logger.put(str(points_counter)+"Points have been logged.")
 
-    tic = time.clock()
-    while True:
+    while True:  # this loop interacts with the children until all points have been evaluated.
         time.sleep(7)
         for p in processes:
             logger.put(str(p.name) + " is alive: " + str(p.is_alive()))
+            if points_counter < max_n_points:
+                if not p.is_alive():  # if a child is dead restart it and add point to queue.
+                    queue.put(optimizer.ask())
+                    points_counter += 1
+                    logger.put("Enqueued Point Number " + str(points_counter))
+                    p.start()
+                    logger.put("Relaunched Child")
         if any([p.is_alive() for p in processes]):
             try:
                 msg = parent_node.recv()  # waits to recieve a message from one of the children
@@ -97,9 +103,8 @@ def server_process():
             break
         logger.put("Server Recieved Message" + str(msg))
         if msg[0] == 'info':
-            toc = time.clock()
             logger.put(str(points_counter) + " out of " + str(max_n_points) +
-                       " Points have been logged in " + str(toc-tic) + " seconds.")
+                       " Points have been logged")
             optimizer.tell(msg[1], msg[2])
             optimizer.log_state()
             if points_counter < max_n_points:
@@ -107,6 +112,7 @@ def server_process():
                 points_counter += 1
                 queue.put(optimizer.ask())
     logger.put("Server finished regularly.")
+    time.sleep(2)  # wait for logger to log before shutting it down
     log_daemon.terminate()
     log_daemon.join()
 
