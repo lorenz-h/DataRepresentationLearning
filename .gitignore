@@ -14,8 +14,8 @@ Resized_Dataset_V02/
 Shearlet_Dataset/
 Wavelet_Dataset_V02/
 cifar-10-batches-py/
-*.txt
 *.npy
 *.pkl
 *.csv
+*.txt
 __pycache__/
