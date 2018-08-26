@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+"""
+This file contains all the definitions for a single Network instance. Its setup_process function gets called
+by the Optimizer from ID_Asynchronous_Optimizer.
+"""
+
 import tensorflow as tf
 import os
 import subprocess
@@ -7,6 +13,12 @@ from ID_Input_Pipeline import create_dataset
 
 
 def conv_layer(input_arr, conv):
+    """
+    This adds a new convolutional layer to the graph.
+    :param input_arr: The input tensor to the layer
+    :param conv: the shape of the convolution to execute in this layer
+    :return: the output of the layer
+    """
     cnv = tf.layers.conv2d(
         inputs=input_arr,
         filters=conv[0],
@@ -181,7 +193,7 @@ def spawn_network(args):
             return test_performance()
 
 
-def setup_thread_environment(args):
+def setup_process_environment(args):
     """
     creates an environment in which to run the network. spawns the network n_runs times and averages the loss returned
     by the network ( either eval or test, depending on args.training)
@@ -205,7 +217,7 @@ def main():
     command_str = "(rm -r _logs)"
     subprocess.run(command_str, shell=True)
     params = ParameterBatch(gpu_id=0, training=False)
-    setup_thread_environment(params)
+    setup_process_environment(params)
 
 
 if __name__ == "__main__":

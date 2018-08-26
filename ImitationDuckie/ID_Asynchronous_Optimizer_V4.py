@@ -1,3 +1,11 @@
+#!/usr/bin/env python
+"""
+This will launch a process_manager that launches a logger process that listens to a queue of logging events from
+all other processes. Then some workers will be spawned that grab hyperparameter batches from a queue that gets populated
+by the optimizer process. The process_manager will wait to recieve the results from the optimizer process. Once it has
+recieved these results it will test the best setups.
+"""
+
 import tensorflow as tf
 from skopt.space import Real, Integer
 
@@ -8,8 +16,16 @@ import subprocess
 import logging
 import csv
 
-from ID_CNN_V01 import setup_thread_environment
+from ID_CNN_V01 import setup_process_environment
 from _utils.ID_utils import check_available_gpus, LoggableOptimizer, map_val_to_param_batch
+
+__author__ = "Lorenz Hetzel"
+__copyright__ = "Copyright 2018, Lorenz Hetzel"
+__credits__ = ["Lorenz Hetzel", "Julian Zilly"]
+__license__ = "GNU GPLv3"
+__version__ = "1.0"
+__maintainer__ = "Lorenz Hetzel"
+__email__ = "hetzell@student.ethz.ch"
 
 
 dim_learning_rate = Real(low=1e-9, high=3e-1, prior='log-uniform', name='learning_rate')
@@ -20,6 +36,11 @@ lock = mp.Lock()
 
 
 def logging_process(logger, testing):
+    """
+    :param logger: The Queue from which to grab the log events.
+    :param testing: Bool indicating wether the logger will be used for testing or for training.
+    :return: ---
+    """
     if testing:
         filename = '_logs/optimizer_test_debug.log'
     else:
@@ -48,7 +69,7 @@ def worker_process(gpu, logger, queue, results_queue, training=True):
             params.gpu_id = gpu
             params.logger = logger
             params.training = training
-            lss = setup_thread_environment(params)
+            lss = setup_process_environment(params)
             with lock:
                 results_queue.put(["info", point, lss])
         except tf.errors.ResourceExhaustedError:
@@ -58,6 +79,14 @@ def worker_process(gpu, logger, queue, results_queue, training=True):
 
 
 def optimizer_process(logger, reserved_gpus, queue, results_queue, child_node):
+    """
+    :param logger:  The Queue to write logging events to.
+    :param reserved_gpus: The GPUs available to the process
+    :param queue: The queue to put the setups provided by the LoggableOptimizer into
+    :param results_queue: The Queue from which to get the results of the workers to tell to the LoggableOptimizer
+    :param child_node: The Pipeline to the process_manager, this will be used to deliver final results of the optimizer
+    :return: ---
+    """
     optimizer = LoggableOptimizer(dimensions=[dim_learning_rate, dim_n_convolutions, dim_dense_nodes], random_state=1)
     n_points_solved = 0
     n_points_enqueued = len(reserved_gpus)+2
@@ -84,6 +113,11 @@ def optimizer_process(logger, reserved_gpus, queue, results_queue, child_node):
 
 
 def testing_best_setups(eval_results, reserved_gpus):
+    """
+    :param eval_results: Tbe Results of the Optimizer
+    :param reserved_gpus: The GPUs available
+    :return: ---
+    """
     n_points_to_test = 3
 
     test_points_queue = mp.Queue()
@@ -134,7 +168,6 @@ def testing_best_setups(eval_results, reserved_gpus):
 
 
 def process_manager():
-
     subprocess.run("(rm -r _logs)", shell=True)
     subprocess.run("(mkdir _logs)", shell=True)
 
@@ -176,9 +209,5 @@ def process_manager():
         logger.put("Optimizer crashed...")
 
 
-def main():
-    process_manager()
-
-
 if __name__ == "__main__":
-    main()
+    process_manager()
