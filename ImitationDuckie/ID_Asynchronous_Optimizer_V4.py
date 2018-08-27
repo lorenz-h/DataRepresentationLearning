@@ -17,7 +17,8 @@ import logging
 import csv
 
 from ID_CNN_V01 import setup_process_environment
-from _utils.ID_utils import check_available_gpus, LoggableOptimizer, map_val_to_param_batch
+from _utils.ID_utils import check_available_gpus, LoggableOptimizer, map_val_to_param_batch, \
+    ParameterBatch, log_default_params
 
 __author__ = "Lorenz Hetzel"
 __copyright__ = "Copyright 2018, Lorenz Hetzel"
@@ -27,11 +28,24 @@ __version__ = "1.0"
 __maintainer__ = "Lorenz Hetzel"
 __email__ = "hetzell@student.ethz.ch"
 
+default_params = ParameterBatch()
 
-dim_learning_rate = Real(low=1e-9, high=3e-1, prior='log-uniform', name='learning_rate')
-dim_n_convolutions = Integer(low=2, high=5, name='n_convolutions')
-dim_dense_nodes = Integer(low=128, high=1028, name='n_dense_nodes')
-max_n_points = 25
+if default_params.use_conv_net:
+    dim_learning_rate = Real(low=1e-9, high=3e-1, prior='log-uniform', name='learning_rate')
+    dim_n_convolutions = Integer(low=1, high=3, name='n_convolutions')
+    dim_conv_dense_nodes = Integer(low=128, high=1028, name='n_dense_nodes')
+    dim_conv_depth_divergence = Real(low=0.8, high=2.0, name='conv_size_divergence')
+
+    optimizer_dimensions = [dim_learning_rate, dim_n_convolutions, dim_conv_dense_nodes, dim_conv_depth_divergence]
+else:
+    dim_dense_learning_rate = Real(low=1e-9, high=3e-1, prior='log-uniform', name='learning_rate')
+    dim_dense_nodes = Integer(low=312, high=1028, name='n_dense_nodes')
+    dim_dense_size_convergence = Real(low=0.7, high=2.0, name='dense_size_convergence')
+    dim_dense_n_layers = Integer(low=3, high=6, name='n_layers')
+
+    optimizer_dimensions = [dim_dense_learning_rate, dim_dense_nodes, dim_dense_size_convergence, dim_dense_n_layers]
+
+max_n_points = 40
 lock = mp.Lock()
 
 
@@ -87,7 +101,7 @@ def optimizer_process(logger, reserved_gpus, queue, results_queue, child_node):
     :param child_node: The Pipeline to the process_manager, this will be used to deliver final results of the optimizer
     :return: ---
     """
-    optimizer = LoggableOptimizer(dimensions=[dim_learning_rate, dim_n_convolutions, dim_dense_nodes], random_state=1)
+    optimizer = LoggableOptimizer(dimensions=optimizer_dimensions, random_state=1)
     n_points_solved = 0
     n_points_enqueued = len(reserved_gpus)+2
     for i in range(len(reserved_gpus)+2):
@@ -173,12 +187,12 @@ def process_manager():
 
     reserved_gpus = check_available_gpus()
     reserved_gpus.pop(0)
-    reserved_gpus.pop(0)
-
     logger = mp.Queue()
     log_daemon = mp.Process(target=logging_process, args=(logger, False, ), daemon=True, name="Logger")
     log_daemon.start()
     logger.put('Started Logging Daemon.')
+
+    log_default_params(logger)
 
     queue = mp.Queue()
     results_queue = mp.Queue()

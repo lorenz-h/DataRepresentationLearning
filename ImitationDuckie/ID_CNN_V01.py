@@ -12,44 +12,47 @@ from _utils.ID_utils import Logger, ParameterBatch, c_print
 from ID_Input_Pipeline import create_dataset
 
 
-def conv_layer(input_arr, conv):
-    """
-    This adds a new convolutional layer to the graph.
-    :param input_arr: The input tensor to the layer
-    :param conv: the shape of the convolution to execute in this layer
-    :return: the output of the layer
-    """
-    cnv = tf.layers.conv2d(
-        inputs=input_arr,
-        filters=conv[0],
-        kernel_size=[conv[1], conv[2]],
-        padding="same",
-        activation=tf.nn.relu,
-        name="conv"+str(conv[0]))
-    new_input_arr = tf.layers.max_pooling2d(inputs=cnv, pool_size=[3, 3], strides=2, name=str(conv[0])+"flat")
-    return new_input_arr
-
-
 def cnn(x, args):
-    """
-    the actual network graph
-    :param x: a single image or a batch of images to be passed into the network. Tensorflow automatically adjusts wether
-    one image or a batch is passed.
-    :param args: ParameterBatch object as defined in ID_Optimizer.py
-    :return: the output of the network
-    """
     input_layer = tf.reshape(x, [-1, args.input_shape[0], args.input_shape[1], args.input_shape[2]])
     input_arr = input_layer
 
+    def conv_layer(conv_input, convolution):
+        cnv = tf.layers.conv2d(
+            inputs=conv_input,
+            filters=convolution[0],
+            kernel_size=[convolution[1], convolution[2]],
+            padding="same",
+            activation=tf.nn.relu,
+            name="conv" + str(convolution[0]))
+        new_input_arr = tf.layers.max_pooling2d(inputs=cnv, pool_size=[3, 3],
+                                                strides=2, name="pool_2d" + str(convolution[0]))
+        return new_input_arr
+
     for conv in args.convolutions:
         input_arr = conv_layer(input_arr, conv)
-    if len(args.convolutions) < 1:
-        if args.input_shape[0]*args.input_shape[1] > 300000:
-            input_arr = tf.layers.max_pooling2d(inputs=input_arr, pool_size=[4, 4], strides=2, name="reduce_size")
+
     pool2_flat = tf.layers.flatten(input_arr, name="FlattenBeforeDense")
     dense = tf.layers.dense(inputs=pool2_flat, units=args.n_dense_nodes, activation=tf.nn.relu)
     dense_2 = tf.layers.dense(inputs=dense, units=int(args.n_dense_nodes/2), activation=tf.nn.relu)
     out = tf.layers.dense(inputs=dense_2, units=1, activation=None)
+    return out
+
+
+def fnn(x, args):
+    input_layer = tf.reshape(x, [-1, args.input_shape[0], args.input_shape[1], args.input_shape[2]])
+    flattened = tf.layers.flatten(input_layer, name="flatten_image")
+    input_tensor = flattened
+
+    def dense_layer(d_input, index):
+        dense = tf.layers.dense(inputs=d_input,
+                                units=int(args.n_dense_nodes / (index*args.dense_size_convergence + 1)),
+                                activation=tf.nn.relu, name="dense_" + str(index))
+        return dense
+
+    for i in range(args.n_dense_layers):
+        input_tensor = dense_layer(input_tensor, i)
+    dense_no_activation = tf.layers.dense(inputs=input_tensor, units=20, activation=None, name="continuation_layer")
+    out = tf.layers.dense(inputs=dense_no_activation, units=1, activation=None, name="output_node")
     return out
 
 
@@ -70,7 +73,10 @@ def spawn_network(args):
     eval_init_op = iterator.make_initializer(eval_data)
     test_init_op = iterator.make_initializer(test_data)
 
-    prediction = cnn(next_features, args)
+    if args.use_conv_net:
+        prediction = cnn(next_features, args)
+    else:
+        prediction = fnn(next_features, args)
 
     element_loss = tf.losses.absolute_difference(
         labels=tf.expand_dims(next_labels, -1),
@@ -182,9 +188,13 @@ def spawn_network(args):
             smallest_eval_loss = sorted(eval_losses)[0]
             print("GPU"+str(args.gpu_id)+" - finished training.")
             return smallest_eval_loss
-
-        experiment_logdir = "gpu" + str(args.batch_size) + "_" + str(args.learning_rate) + \
-                            str(args.n_dense_nodes) + "_" + str(len(args.convolutions))
+        if args.use_conv_net:
+            experiment_logdir = "gpu" + str(args.gpu_id) + "_" + str(args.learning_rate) + \
+                                str(args.n_dense_nodes) + "_" + str(len(args.convolutions))
+        else:
+            experiment_logdir = "gpu" + str(args.gpu_id) + "_" + str(args.learning_rate) + \
+                                str(args.n_dense_nodes) + "_" + str(args.dense_size_convergence) + \
+                                "_" + str(args.n_dense_layers)
         logdir = os.path.join("_logs", experiment_logdir)
         if args.training:
             return training()

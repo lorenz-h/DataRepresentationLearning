@@ -2,7 +2,9 @@ import csv
 from scipy.misc import imsave, imread
 import numpy as np
 import scipy.fftpack
-destination_folder = "/media/sdb/hetzell/raw_dataset/training/"
+from skimage.transform import rescale, resize, downscale_local_mean
+
+destination_folder = "/media/sdb/hetzell/raw_dataset/evaluation/"
 j_max = 2
 input_shape = [480, 640, 3]
 
@@ -30,7 +32,7 @@ def dct2(image):
     return output
 
 
-with open('../_data/hetzell_training_data.csv', newline='') as csvfile:
+with open('../_data/hetzell_evaluation_data.csv', newline='') as csvfile:
     spamreader = csv.reader(csvfile, delimiter=',', quotechar='|')
     for row in spamreader:
         rows.append(row)
@@ -39,16 +41,16 @@ with open('../_data/hetzell_training_data.csv', newline='') as csvfile:
 i = 0
 for row in rows:
     img = grab_image(row[1])
-
+    image_resized = rescale(img, scale=0.125)
     file_name = "sample" + str(i) + ".png"
     destination_path = destination_folder + file_name
-    imsave(destination_path, img)
+    imsave(destination_path, image_resized)
     if i % 20 == 0:
         print("Image", i, "done.")
     new_row = [row[0], destination_path]
     new_rows.append(new_row)
     i += 1
-with open('../_data/hetzell_raw_training_data.csv', 'w', newline='') as csvfile:
+with open('../_data/hetzell_raw_evaluation_data.csv', 'w', newline='') as csvfile:
     spamwriter = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
     for row in new_rows:
         spamwriter.writerow(row)

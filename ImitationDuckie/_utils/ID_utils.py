@@ -109,14 +109,10 @@ def calc_average_label_size(dataset_dir):
     return avg_label
 
 
-def get_convolutions(n_convs):
-    """
-    :param n_convs: the number of kernels to produce
-    :return: a list of kernels of shape (conv_depth, kernel_size_x, kernel_size_y)
-    """
+def get_convolutions(n_convs, conv_size_divergion):
     convolutions = []
     for i in range(1, n_convs+1):
-        convolutions.append((i*32, 5, 5))
+        convolutions.append((int(i*conv_size_divergion*32), 5, 5))
     return convolutions
 
 
@@ -147,12 +143,15 @@ class ParameterBatch:
     """
     def __init__(self,
                  learning_rate=0.0005,
-                 input_shape=[480, 640, 1],
+                 input_shape=[80, 60, 1],
                  batch_size=24,
                  convolutions=[(64, 7, 7), (128, 5, 5)],
+                 conv_size_divergence=1.0,
                  gpu_id=2,
+                 n_dense_layers=4,
                  n_dense_nodes=128,
                  n_max_epochs=30,
+                 dense_size_convergence=1.3,
                  n_runs=2,
                  training=True,
                  train_csv_file="_data/hetzell_raw_training_data.csv",
@@ -172,6 +171,10 @@ class ParameterBatch:
         self.test_csv_file = test_csv_file
         self.eval_csv_file = eval_csv_file
         self.logger = None
+        self.use_conv_net = True
+        self.n_dense_layers = n_dense_layers
+        self.dense_size_convergence = dense_size_convergence
+        self.conv_size_divergence = conv_size_divergence
 
 
 class LoggableOptimizer(skopt.Optimizer):
@@ -216,11 +219,29 @@ def map_val_to_param_batch(vals):
     :param vals: list of values from Optimizer
     :return: ParameterBatch object
     """
-    params = ParameterBatch(learning_rate=vals[0],
-                            convolutions=get_convolutions(vals[1]),
-                            n_dense_nodes=vals[2])
+    params = ParameterBatch()
+
+    if params.use_conv_net:
+        params.learning_rate = vals[0]
+        params.convolutions = get_convolutions(vals[1], vals[3])
+        params.n_dense_nodes = vals[2]
+    else:
+        params.learning_rate = vals[0]
+        params.n_dense_nodes = vals[1]
+        params.dense_size_convergence = vals[2]
+        params.n_dense_layers = vals[3]
     return params
 
+
+def log_default_params(logger):
+    default_params = ParameterBatch()
+    attrs = vars(default_params)
+    print(attrs)
+    logger.put("#############################################")
+    logger.put("HYPERPARAMETERS:")
+    for item in attrs.items():
+        logger.put(str(item[0]) + " : " + str(item[1]))
+    logger.put("#############################################")
 # ########################LEGACY_CODE###################################################
 """
 This code is not used in the final versions and only preserved to ensure compatibility with older versions
