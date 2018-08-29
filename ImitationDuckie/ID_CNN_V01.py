@@ -89,7 +89,6 @@ def spawn_network(args):
     accuracy = tf.divide((static_approx_error - loss), static_approx_error)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=args.learning_rate).minimize(loss)
-    args.logger.put("Child Graph" + str(args.gpu_id) + " has been built.")
     with tf.Session() as sess:
         tf.RunOptions(report_tensor_allocations_upon_oom=True),
         sess.run(tf.global_variables_initializer())
@@ -109,7 +108,7 @@ def spawn_network(args):
                     test_loss += lss
                     batches += 1
                     if batches % 50 == 0:
-                        print("GPU" + str(args.gpu_id) + ": Testbatch" + str(batches) + "done.")
+                        args.logger.put("GPU" + str(args.gpu_id) + ": Testbatch " + str(batches) + " done.")
                 except tf.errors.OutOfRangeError:
                     break
             assert batches is not 0, "NO TEST DATA PASSED"
@@ -119,7 +118,7 @@ def spawn_network(args):
 
         def evaluate_performance(ep):
             """
-            runs the network over the evaluation_dataset.
+            runs the network on the evaluation_dataset.
             :param ep: the training epoch in which the evaluation is performed
             :return: the evaluation loss
             """
@@ -139,7 +138,8 @@ def spawn_network(args):
             assert batches is not 0, "NO EVALUATION DATA PASSED"
             ev_loss /= batches
             ev_acc /= batches
-            evaluation_logger.log_scalar("evaluation_loss", ev_loss, ep)
+            evaluation_logger.log_scalar("eval_training_loss", ev_loss, ep)
+            evaluation_logger.log_scalar("eval_training_acc", ev_acc, ep)
             return ev_loss, ev_acc
 
         def training():
@@ -170,37 +170,37 @@ def spawn_network(args):
                 training_logger.log_scalar("epoch_training_acc", epoch_acc, epoch)
                 if epoch % 3 == 1:
                     eval_loss, eval_acc = evaluate_performance(epoch)
-                    args.logger.put("Epoch" + str(epoch) + "on GPU" +
-                                    str(args.gpu_id) + "- Evaluation loss was:" +
-                                    str(eval_loss))
+                    training_logger.log_scalar("epoch_eval_loss", eval_loss, epoch)
+                    training_logger.log_scalar("epoch_eval_acc", eval_acc, epoch)
                     eval_losses.append(eval_loss)
                     n_better_setups = 0
                     for stored_lss in eval_losses:
                         if stored_lss < eval_loss:
                             n_better_setups += 1
                     if n_better_setups > 2:
-                        print("GPU" + str(args.gpu_id)+" - eval error has been increasing again")
+                        args.logger.put("GPU" + str(args.gpu_id)+" - eval error has been increasing again")
                         break
                     if epoch > int(args.n_max_epochs / 2):
                         if eval_acc < 0.1:
                             break
                 epoch += 1
             smallest_eval_loss = sorted(eval_losses)[0]
-            print("GPU"+str(args.gpu_id)+" - finished training.")
+            args.logger.put("GPU"+str(args.gpu_id)+" - finished training.")
             return smallest_eval_loss
+
         if args.use_conv_net:
             experiment_logdir = "gpu" + str(args.gpu_id) + "_" + str(args.learning_rate) + \
-                                str(args.n_dense_nodes) + "_" + str(len(args.convolutions))
+                                str(args.n_dense_nodes) + "_" + str(len(args.convolutions)) + str(args.testing)
         else:
             experiment_logdir = "gpu" + str(args.gpu_id) + "_" + str(args.learning_rate) + \
                                 str(args.n_dense_nodes) + "_" + str(args.dense_size_convergence) + \
-                                "_" + str(args.n_dense_layers)
+                                "_" + str(args.n_dense_layers) + str(args.testing)
         logdir = os.path.join("_logs", experiment_logdir)
-        if args.training:
-            return training()
-        else:
+        if args.testing:
             training()
             return test_performance()
+        else:
+            return training()
 
 
 def setup_process_environment(args):

@@ -15,10 +15,11 @@ from queue import Empty
 import subprocess
 import logging
 import csv
+from queue import Empty
 
 from ID_CNN_V01 import setup_process_environment
 from _utils.ID_utils import check_available_gpus, LoggableOptimizer, map_val_to_param_batch, \
-    ParameterBatch, log_default_params
+    ParameterBatch, log_default_params, limit_size
 
 __author__ = "Lorenz Hetzel"
 __copyright__ = "Copyright 2018, Lorenz Hetzel"
@@ -46,19 +47,12 @@ else:
     optimizer_dimensions = [dim_dense_learning_rate, dim_dense_nodes, dim_dense_size_convergence, dim_dense_n_layers]
 
 max_n_points = 40
+max_n_gpus = 4
 lock = mp.Lock()
 
 
-def logging_process(logger, testing):
-    """
-    :param logger: The Queue from which to grab the log events.
-    :param testing: Bool indicating wether the logger will be used for testing or for training.
-    :return: ---
-    """
-    if testing:
-        filename = '_logs/optimizer_test_debug.log'
-    else:
-        filename = '_logs/optimizer_debug.log'
+def logging_process(logger):
+    filename = '_logs/optimizer_debug.log'
     logging.basicConfig(filename=filename, level=logging.DEBUG)
     sec = 0
     while True:
@@ -73,7 +67,7 @@ def logging_process(logger, testing):
                 logging.info("Logger is still alive after " + str(sec) + " seconds.")
 
 
-def worker_process(gpu, logger, queue, results_queue, training=True):
+def worker_process(gpu, logger, queue, results_queue, testing):
     time.sleep(2)
     logger.put("Started Child" + str(gpu))
     while True:
@@ -82,7 +76,7 @@ def worker_process(gpu, logger, queue, results_queue, training=True):
             params = map_val_to_param_batch(point)
             params.gpu_id = gpu
             params.logger = logger
-            params.training = training
+            params.testing = testing
             lss = setup_process_environment(params)
             with lock:
                 results_queue.put(["info", point, lss])
@@ -119,66 +113,59 @@ def optimizer_process(logger, reserved_gpus, queue, results_queue, child_node):
         except Empty:
             time.sleep(10)
         if n_points_solved >= max_n_points:
+            logger.put("Max number of points have been solved")
             break
     sorted_eval_results = sorted(list(zip(optimizer.yi, optimizer.Xi)), key=lambda tup: tup[0])
     logger.put(str(sorted_eval_results))
     child_node.send(sorted_eval_results)
     child_node.close()
+    logger.put("Optimizer reported results and will now close.")
 
 
-def testing_best_setups(eval_results, reserved_gpus):
-    """
-    :param eval_results: Tbe Results of the Optimizer
-    :param reserved_gpus: The GPUs available
-    :return: ---
-    """
-    n_points_to_test = 3
-
-    test_points_queue = mp.Queue()
-    test_results_queue = mp.Queue()
-    test_logger = mp.Queue()
-
-    test_log_daemon = mp.Process(target=logging_process, args=(test_logger, True,), daemon=True, name="TestLogger")
-    test_log_daemon.start()
-    test_logger.put('Started Testing Logging Daemon.')
-    test_logger.put(eval_results)
-
+def testing_best_setups(logger, eval_results, reserved_gpus):
+    logger.put("STARTING TESTING")
+    n_points_to_test = 10
+    points_to_test = mp.Queue()
+    test_results = mp.Queue()
+    workers = []
     for i in range(n_points_to_test):
-        test_points_queue.put(eval_results[i][1])
-
-    test_workers = []
+        points_to_test.put(eval_results[i][1])
     for i in range(len(reserved_gpus)):
-        p = mp.Process(target=worker_process, args=(reserved_gpus[i], test_logger,
-                                                    test_points_queue, test_results_queue, True,))
+        p = mp.Process(target=worker_process, args=(reserved_gpus[i], logger, points_to_test, test_results, True, ))
         p.start()
-        test_workers.append(p)
-
-    n_points_tested = 0
-    while n_points_tested < n_points_to_test:
-        try:
-            msg = test_results_queue.get(block=False)
-            if msg[0] == 'info':
-                n_points_tested += 1
-
-        except Empty:
-            time.sleep(7)
-
-    for p in test_workers:
+        workers.append(p)
+    old_size = n_points_to_test
+    while test_results.qsize() < n_points_to_test:
+        """
+        This loop waits for the workers to finish and occasionally logs their progress.
+        """
+        time.sleep(3)
+        if test_results.qsize() < old_size:
+            logger.put(str(n_points_to_test-test_results.qsize()) + "Points have been tested.")
+            old_size = test_results.qsize()
+    for p in workers:
         p.terminate()
-        p.join()
-    test_log_daemon.terminate()
-    test_log_daemon.join()
+        p.join
+    logger.put("All Testing workers have been terminated")
+    results = []
+    try:
+        while not test_results.empty():
+            result_message = test_results.get(block=True, timeout=20)
+            results.append([result_message[2], result_message[1]])
 
-    with open("_logs/test_results.csv", 'w') as file:
-        writer = csv.writer(file, delimiter=';')
-        for row in eval_results:
-            to_print = []
-            result = row[0]
-            setup = row[1]
-            to_print.append(result)
-            for param in setup:
-                to_print.append(param)
-            writer.writerow(to_print)
+        csv_file = '_logs/testing_results.csv'
+        with open(csv_file, 'w') as file:
+            writer = csv.writer(file, delimiter=';')
+            for row in results:
+                to_print = []
+                result = row[0]
+                setup = row[1]
+                to_print.append(result)
+                for param in setup:
+                    to_print.append(param)
+                writer.writerow(to_print)
+    except Empty:
+        logger.put("Error occurred in results retrieval. No CSV file created.")
 
 
 def process_manager():
@@ -186,9 +173,10 @@ def process_manager():
     subprocess.run("(mkdir _logs)", shell=True)
 
     reserved_gpus = check_available_gpus()
-    reserved_gpus.pop(0)
+    reserved_gpus = limit_size(reserved_gpus, max_n_gpus)
+
     logger = mp.Queue()
-    log_daemon = mp.Process(target=logging_process, args=(logger, False, ), daemon=True, name="Logger")
+    log_daemon = mp.Process(target=logging_process, args=(logger, ), daemon=True, name="Logger")
     log_daemon.start()
     logger.put('Started Logging Daemon.')
 
@@ -200,7 +188,7 @@ def process_manager():
 
     workers = []
     for i in range(len(reserved_gpus)):
-        p = mp.Process(target=worker_process, args=(reserved_gpus[i], logger, queue, results_queue, True, ))
+        p = mp.Process(target=worker_process, args=(reserved_gpus[i], logger, queue, results_queue, False, ))
         p.start()
         workers.append(p)
 
@@ -213,9 +201,9 @@ def process_manager():
         for p in workers:
             p.terminate()
             p.join()
-
-        testing_best_setups(optimizer_results, reserved_gpus)
-        logger.put("Testing Ran Sucessfully Exiting...")
+        logger.put("All Children have been shut down.")
+        testing_best_setups(logger, optimizer_results, reserved_gpus)
+        logger.put("Testing successfull. Shutting down Logger...")
         time.sleep(2)
         log_daemon.terminate()
         log_daemon.join()

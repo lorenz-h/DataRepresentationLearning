@@ -1,12 +1,14 @@
 import subprocess
 import argparse
-import tensorflow as tf
 import os
-import numpy as np
 from os import listdir
 import multiprocessing as mp
 import csv
+import sys
+
+import tensorflow as tf
 import skopt
+import numpy as np
 
 
 def check_available_gpus():
@@ -150,13 +152,13 @@ class ParameterBatch:
                  gpu_id=2,
                  n_dense_layers=4,
                  n_dense_nodes=128,
-                 n_max_epochs=30,
+                 n_max_epochs=50,
                  dense_size_convergence=1.3,
-                 n_runs=2,
-                 training=True,
-                 train_csv_file="_data/hetzell_raw_training_data.csv",
-                 eval_csv_file="_data/hetzell_raw_evaluation_data.csv",
-                 test_csv_file="_data/hetzell_raw_testing_data.csv"
+                 testing=False,
+                 n_runs=1,
+                 train_csv_file="_data/hetzell_dct_training_data.csv",
+                 eval_csv_file="_data/hetzell_dct_evaluation_data.csv",
+                 test_csv_file="_data/hetzell_dct_testing_data.csv"
                  ):
         self.learning_rate = learning_rate
         self.input_shape = input_shape
@@ -166,22 +168,32 @@ class ParameterBatch:
         self.n_dense_nodes = n_dense_nodes
         self.n_max_epochs = n_max_epochs
         self.n_runs = n_runs
-        self.training = training
         self.train_csv_file = train_csv_file
         self.test_csv_file = test_csv_file
         self.eval_csv_file = eval_csv_file
         self.logger = None
+        self.testing = testing
         self.use_conv_net = True
         self.n_dense_layers = n_dense_layers
         self.dense_size_convergence = dense_size_convergence
         self.conv_size_divergence = conv_size_divergence
 
 
+def yes_or_no(question):
+    reply = str(input(question+' (y/n): ')).lower().strip()
+    if reply[0] == 'y':
+        return True
+    if reply[0] == 'n':
+        return False
+    else:
+        return yes_or_no("Uhhhh... please enter ")
+
+
 class LoggableOptimizer(skopt.Optimizer):
     """
     This class inherits from the skopt Optimizer class. All it does is add logging functionality.
     """
-    def __init__(self, dimensions, random_state, csv_file='_logs/optimizer_log.csv', logging=True):
+    def __init__(self, dimensions, random_state, csv_file='_logs/optimizer_results.csv', logging=True):
         skopt.Optimizer.__init__(self, dimensions=dimensions, random_state=random_state)
         self._lock = mp.Lock()
         self.logging = logging
@@ -242,6 +254,17 @@ def log_default_params(logger):
     for item in attrs.items():
         logger.put(str(item[0]) + " : " + str(item[1]))
     logger.put("#############################################")
+
+
+def limit_size(list_obj, max_size):
+    if len(list_obj) < max_size:
+        return list_obj
+    else:
+        for i in range(len(list_obj)-max_size):
+            list_obj.pop(0)
+        return list_obj
+
+
 # ########################LEGACY_CODE###################################################
 """
 This code is not used in the final versions and only preserved to ensure compatibility with older versions

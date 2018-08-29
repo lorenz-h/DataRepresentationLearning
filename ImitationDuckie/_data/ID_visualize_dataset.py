@@ -30,6 +30,8 @@ train_labels = [float(row[0]) for row in train_rows]
 eval_labels = [float(row[0]) for row in eval_rows]
 test_labels = [float(row[0]) for row in test_rows]
 
+all_labels = train_labels + eval_labels + test_labels
+
 print("STANDARD DEVIATIONS:")
 print("Train", np.std(train_labels))
 print("Eval", np.std(eval_labels))
@@ -51,5 +53,9 @@ plt.hist(train_labels, bins, alpha=0.3, label='train_labels', density=True)
 plt.hist(eval_labels, bins, alpha=0.3, label='eval_labels', density=True)
 plt.hist(test_labels, bins, alpha=0.3, label='test_labels', density=True)
 plt.legend(loc='upper right')
+plt.show()
 
+dpi = 320
+plt.figure(figsize=(2000/dpi, 1500/dpi), dpi=dpi)
+plt.hist(all_labels, bins, label='train_labels', density=True)
 plt.show()
