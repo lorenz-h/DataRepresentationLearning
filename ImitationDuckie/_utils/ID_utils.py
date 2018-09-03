@@ -114,7 +114,7 @@ def calc_average_label_size(dataset_dir):
 def get_convolutions(n_convs, conv_size_divergion):
     convolutions = []
     for i in range(1, n_convs+1):
-        convolutions.append((int(i*conv_size_divergion*32), 5, 5))
+        convolutions.append((int(i*conv_size_divergion*16), 3, 3))
     return convolutions
 
 

@@ -47,7 +47,7 @@ else:
     optimizer_dimensions = [dim_dense_learning_rate, dim_dense_nodes, dim_dense_size_convergence, dim_dense_n_layers]
 
 max_n_points = 40
-max_n_gpus = 4
+max_n_gpus = 2
 lock = mp.Lock()
 
 
