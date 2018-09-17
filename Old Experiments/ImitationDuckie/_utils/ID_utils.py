@@ -245,6 +245,28 @@ def map_val_to_param_batch(vals):
     return params
 
 
+def map_point_to_param_batch(vals):
+    """
+    Maps the values given by an Optimizer into a ParameterBatch object.
+    :param vals: list of values from Optimizer
+    :return: ParameterBatch object
+    """
+    params = ParameterBatch()
+
+    if params.use_conv_net:
+        params.learning_rate = vals[0]
+        params.convolutions = get_convolutions(vals[1], vals[3])
+        params.n_dense_nodes = vals[2]
+        params.gpu_id = vals[4]
+    else:
+        params.learning_rate = vals[0]
+        params.n_dense_nodes = vals[1]
+        params.dense_size_convergence = vals[2]
+        params.n_dense_layers = vals[3]
+        params.gpu_id = vals[4]
+    return params
+
+
 def log_default_params(logger):
     default_params = ParameterBatch()
     attrs = vars(default_params)

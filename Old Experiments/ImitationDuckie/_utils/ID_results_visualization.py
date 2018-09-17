@@ -1,23 +1,37 @@
-import csv
-
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
+from pandas.api.types import is_numeric_dtype
+
+my_dpi = 100
+saving = True
 
 
 def make_barplot(height, ylabel):
+    fig, ax = plt.subplots(figsize=(5, 5), dpi=my_dpi)
     bars = ('raw', 'dct', 'slt')
     y_pos = list(range(len(bars)))
-    plt.bar(y_pos, height, width=0.6, color=sns.color_palette("cubehelix", 3), alpha=0.75)
-    plt.xticks(y_pos, bars)
-    plt.ylabel(ylabel)
-    plt.show()
+    plt.bar(y_pos, height, width=0.4, color=sns.color_palette("cubehelix", 3), alpha=0.5)
+    ax.set_xticks(y_pos, bars)
+    ax.set_ylabel(ylabel)
+    ax.yaxis.labelpad = 10
+    fig.show()
+    if saving:
+        fig.savefig("result_visualization_figs/" + ylabel + ".png")
+
+
+def remove_outlier(df, name):
+    low = .05
+    high = .95
+    quant_df = df.quantile([low, high])
+    df = df[(df[name] > quant_df.loc[low, name]) & (df[name] < quant_df.loc[high, name])]
+    return df
 
 
 def check_overfitting():
     results = []
-    for experiment in ["raw_cnn", "raw_dnn", "dct_cnn", "dct_dnn", "slt_cnn", "slt_dnn"]:
+    for experiment in ["RAW ConvNet", "RAW DenseNet", "DCT ConvNet", "DCT DenseNet", "SLT ConvNet", "SLT DenseNet"]:
         testdata = []
         csv_file = "../_saved_logs/_logs_" + experiment + "/testing_results.csv"
         df = pd.read_csv(csv_file, header=None, delimiter=";")
@@ -27,6 +41,7 @@ def check_overfitting():
         df["labels"] = labels
         result = pd.concat([df["labels"], df[0], df[1], df[2], df[3], df[4]], axis=1)
         result.columns = ["experiment", "loss", "learning_rate", "n_convs", "dense_nodes", "depth_div"]
+        result = remove_outlier(result, "loss")
         testdata.append(result)
 
         testdata = pd.concat(testdata, axis=0)
@@ -59,93 +74,139 @@ def check_overfitting():
         testdata["eval_loss"] = eval_losses
 
         testdata['delta_loss'] = testdata["loss"]-testdata["eval_loss"]
-        #  testdata['delta_loss'] = testdata['delta_loss'].abs()
 
         result = pd.concat([testdata['delta_loss'], testdata["experiment"]], axis=1)
         results.append(result)
     results = pd.concat(results, axis=0)
     print(results.shape)
 
-    sns.catplot(x="experiment", y="delta_loss", data=results, jitter=True, alpha=0.3)
-    sns.pointplot(x="experiment", y="delta_loss",
+    ##
+    ##
+    ##
+    fig, ax = plt.subplots(figsize=(8, 5), dpi=my_dpi)
+
+    sns.catplot(ax=ax, x="experiment", y="delta_loss", data=results, jitter=True, alpha=0.3)
+    sns.pointplot(ax=ax, x="experiment", y="delta_loss",
                   data=results, dodge=.532, join=False,
-                  markers="d", scale=1.2, ci=None, palette="cubehelix")
-    plt.ylabel("overfitting")
-    plt.ylim((-0.01, 0.04))
-    plt.show()
+                  markers="d", scale=1.6, ci=None, palette="cubehelix")
+    ax.set_ylabel("loss delta")
+    ax.xaxis.labelpad = 10
+    ax.yaxis.labelpad = 10
+    ax.set_ylim((-0.01, 0.04))
+    fig.show()
+    if saving:
+        fig.savefig("result_visualization_figs/overfitting.png")
+    ##
+    ##
+    ##
 
 
-def testing_results():
+def tt_results():
     datasets = []
-    for experiment in ["raw_cnn", "raw_dnn", "dct_cnn", "dct_dnn", "slt_cnn", "slt_dnn"]:
+    for experiment in ["Raw ConvNet", "Raw DenseNet", "DCT ConvNet", "DCT DenseNet", "SLT ConvNet", "SLT DenseNet"]:
         csv_file = "../_saved_logs/_logs_" + experiment + "/testing_results.csv"
         df = pd.read_csv(csv_file, header=None, delimiter=";")
-
         labels = [experiment for _ in range(int(df[0].size))]
         labels = np.asarray(labels)
         df["labels"] = labels
 
         result = pd.concat([df["labels"], df[0], df[1]], axis=1)
         result.columns = ["experiment", "loss", "learning rate"]
+        result = remove_outlier(result, "loss")
         datasets.append(result)
 
     datasets = pd.concat(datasets, axis=0)
 
-    metric = (0.135-datasets["loss"])/0.135
+    metric = 1 - ((0.135-datasets["loss"])/0.135)
     metric = np.asarray(metric)
     datasets["metric"] = metric
 
     print(list(datasets.columns.values))
-    sns.catplot(x="experiment", y="loss", data=datasets, jitter=True, alpha=0.3)
-    sns.pointplot(x="experiment", y="loss",
+    ##
+    ##
+    sns.set(style="whitegrid")
+    ##
+    ##
+
+    fig, ax = plt.subplots(figsize=(8, 5), dpi=my_dpi)
+
+    sns.catplot(ax=ax, x="experiment", y="loss", data=datasets, jitter=True, alpha=0.3, palette="cubehelix")
+    plt.ylabel("absolute loss")
+    sns.pointplot(ax=ax, x="experiment", y="loss",
                   data=datasets, dodge=.532, join=False,
-                  markers="d", scale=1.2, ci=None, palette="cubehelix")
-    plt.show()
-    sns.catplot(x="experiment", y="metric", data=datasets, jitter=True, alpha=0.3)
-    sns.pointplot(x="experiment", y="metric",
+                  markers="d", scale=1.6, ci=None, palette="cubehelix")
+    ax.set_ylabel("absolute loss")
+    ax.xaxis.labelpad = 10
+    ax.yaxis.labelpad = 10
+    fig.show()
+    if saving:
+        fig.savefig("result_visualization_figs/absolute_loss.png")
+    ##
+    ##
+    ##
+   
+    fig, ax = plt.subplots(figsize=(8, 5), dpi=my_dpi)
+
+    sns.catplot(ax=ax, x="experiment", y="metric", data=datasets, jitter=True, alpha=0.3, palette="cubehelix")
+    plt.ylabel("relative loss")
+    sns.pointplot(ax=ax, x="experiment", y="metric",
                   data=datasets, dodge=.532, join=False,
-                  markers="d", scale=1.2, ci=None, palette="cubehelix")
-    plt.ylabel("relative performance")
-    plt.show()
+                  markers="d", scale=1.6, ci=None, palette="cubehelix")
+    ax.set_ylabel("relative loss")
+    ax.xaxis.labelpad = 10
+    ax.yaxis.labelpad = 10
+    fig.show()
+    if saving:
+        fig.savefig("result_visualization_figs/relative_loss.png")
+    ##
+    ##
+    ##
 
 
-def optimizer_results():
+def tt_results_without_dct():
     datasets = []
-    for experiment in ["raw_cnn", "raw_dnn", "dct_cnn", "dct_dnn", "slt_cnn", "slt_dnn"]:
-        csv_file = "../_saved_logs/_logs_" + experiment + "/optimizer_results.csv"
+    for experiment in ["Raw ConvNet", "Raw DenseNet", "DCT ConvNet", "SLT ConvNet", "SLT DenseNet"]:
+        csv_file = "../_saved_logs/_logs_" + experiment + "/testing_results.csv"
         df = pd.read_csv(csv_file, header=None, delimiter=";")
-
         labels = [experiment for _ in range(int(df[0].size))]
         labels = np.asarray(labels)
         df["labels"] = labels
 
         result = pd.concat([df["labels"], df[0], df[1]], axis=1)
         result.columns = ["experiment", "loss", "learning rate"]
+        result = remove_outlier(result, "loss")
         datasets.append(result)
 
     datasets = pd.concat(datasets, axis=0)
 
-    metric = (0.135-datasets["loss"])/0.135
+    metric = 1 - ((0.135 - datasets["loss"]) / 0.135)
     metric = np.asarray(metric)
     datasets["metric"] = metric
 
     print(list(datasets.columns.values))
-    sns.catplot(x="experiment", y="loss", data=datasets, jitter=True, alpha=0.3)
-    sns.pointplot(x="experiment", y="loss",
-                  data=datasets, dodge=.532, join=False,
-                  markers="d", scale=1.2, ci=None, palette="cubehelix")
-    plt.show()
-    sns.catplot(x="experiment", y="metric", data=datasets, jitter=True, alpha=0.3)
-    sns.pointplot(x="experiment", y="metric",
-                  data=datasets, dodge=.532, join=False,
-                  markers="d", scale=1.2, ci=None, palette="cubehelix")
-    plt.ylabel("relative performance")
-    plt.show()
+    ##
+    ##
+    sns.set(style="whitegrid")
+
+    fig, ax = plt.subplots(figsize=(8, 5), dpi=my_dpi)
+    sns.boxplot(x="experiment", y="loss", data=datasets, whis=np.inf)
+    ax.set_ylabel("absolute loss")
+    ax.xaxis.labelpad = 10
+    ax.yaxis.labelpad = 10
+    fig.show()
+    fig, ax = plt.subplots(figsize=(8, 5), dpi=my_dpi)
+    sns.boxplot(x="experiment", y="metric", data=datasets, whis=np.inf)
+    ax.set_ylabel("relative loss")
+    ax.xaxis.labelpad = 10
+    ax.yaxis.labelpad = 10
+    fig.show()
+    ##
+    ##
 
 
 def conv_testing_results():
     lldata = []
-    for experiment in ["raw_cnn", "dct_cnn", "slt_cnn"]:
+    for experiment in ["RAW ConvNet", "DCT ConvNet", "SLT ConvNet"]:
         csv_file = "../_saved_logs/_logs_" + experiment + "/testing_results.csv"
         df = pd.read_csv(csv_file, header=None, delimiter=";")
 
@@ -154,6 +215,7 @@ def conv_testing_results():
         df["labels"] = labels
         result = pd.concat([df["labels"], df[0], df[1], df[2], df[3], df[4]], axis=1)
         result.columns = ["experiment", "loss", "learning_rate", "n_convs", "dense_nodes", "depth_div"]
+        result = remove_outlier(result, "loss")
         lldata.append(result)
 
     datasets = pd.concat(lldata, axis=0)
@@ -174,7 +236,7 @@ def conv_testing_results():
 
 def dense_testing_results():
     lldata = []
-    for experiment in ["raw_dnn", "dct_dnn", "slt_dnn"]:
+    for experiment in ["RAW DenseNet", "DCT DenseNet", "SLT DenseNet"]:
         csv_file = "../_saved_logs/_logs_" + experiment + "/testing_results.csv"
         df = pd.read_csv(csv_file, header=None, delimiter=";")
 
@@ -183,21 +245,8 @@ def dense_testing_results():
         df["labels"] = labels
         result = pd.concat([df["labels"], df[0], df[1], df[2], df[3], df[4]], axis=1)
         result.columns = ["experiment", "loss", "learning_rate", "dense_nodes", "size_convergence", "n_layers"]
+        result = remove_outlier(result, "loss")
         lldata.append(result)
-
-    datasets = pd.concat(lldata, axis=0)
-    print(list(datasets.columns.values))
-    # Make fake dataset
-    """
-    height = [dt["dense_nodes"].mean() for dt in lldata]
-    make_barplot(height, ylabel="dense nodes")
-
-    height = [dt["n_layers"].mean() for dt in lldata]
-    make_barplot(height, ylabel="# layers")
-
-    height = [dt["size_convergence"].mean() for dt in lldata]
-    make_barplot(height, ylabel="size convergence")
-    """
 
     complexities = []
     for dt in lldata:
@@ -209,6 +258,12 @@ def dense_testing_results():
     make_barplot(complexities, ylabel="dense network size")
 
 
-if __name__ == "__main__":
+def main():
     sns.set(palette="cubehelix", style="white")
-    check_overfitting()
+    tt_results()
+    tt_results_without_dct()
+
+
+if __name__ == "__main__":
+    main()
+

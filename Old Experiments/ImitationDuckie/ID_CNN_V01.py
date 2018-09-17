@@ -226,7 +226,7 @@ def main():
     c_print("Running Standalone Version using default parameters.", color="blue")
     command_str = "(rm -r _logs)"
     subprocess.run(command_str, shell=True)
-    params = ParameterBatch(gpu_id=0, training=False)
+    params = ParameterBatch(gpu_id=7)
     setup_process_environment(params)
 
 

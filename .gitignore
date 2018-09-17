@@ -19,4 +19,6 @@ cifar-10-batches-py/
 *.pkl
 *.csv
 *.txt
+*.psd
+*.png
 __pycache__/
