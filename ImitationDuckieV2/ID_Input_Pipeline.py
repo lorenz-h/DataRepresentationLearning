@@ -1,3 +1,7 @@
+"""
+The input pipeline is defined in this file. It reads CSV files into tf.dataset objects, and dynamically fetches images
+from their paths only as soon as they are required.
+"""
 import tensorflow as tf
 
 # Describe the dataset:

@@ -3,7 +3,12 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 
-my_dpi = 100
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif')
+
+
+my_dpi = 200
+scale = 1.2
 saving = True
 
 cache_folder = "_cache_ID_results_visualization"
@@ -74,9 +79,9 @@ def check_overfitting():
         eval_losses = np.asarray(eval_losses)
         testdata["eval_loss"] = eval_losses
 
-        testdata['delta_loss'] = testdata["loss"]-testdata["eval_loss"]
+        testdata['deltaloss'] = testdata["loss"]-testdata["eval_loss"]
 
-        result = pd.concat([testdata['delta_loss'], testdata["experiment"]], axis=1)
+        result = pd.concat([testdata['deltaloss'], testdata["experiment"]], axis=1)
         results.append(result)
     results = pd.concat(results, axis=0)
     print(results.shape)
@@ -84,19 +89,23 @@ def check_overfitting():
     ##
     ##
     ##
-    fig, ax = plt.subplots(figsize=(8, 5), dpi=my_dpi)
 
-    sns.catplot(ax=ax, x="experiment", y="delta_loss", data=results, jitter=True, alpha=0.3, palette="cubehelix")
-    sns.pointplot(ax=ax, x="experiment", y="delta_loss",
+    fig, ax = plt.subplots(figsize=(8/scale, 5/scale), dpi=my_dpi)
+    plt.xticks(rotation=20)
+    sns.catplot(ax=ax, x="experiment", y="deltaloss", data=results, jitter=True, alpha=0.3, palette="cubehelix")
+
+    sns.pointplot(ax=ax, x="experiment", y="deltaloss",
                   data=results, dodge=.532, join=False,
                   markers="d", scale=1.6, ci=None, palette="cubehelix")
-    ax.set_ylabel("loss delta")
+    ax.set_ylabel("Delta loss   " + r'$=\lambda_{eval}-\lambda_{test}$')
+    ax.set_xlabel("")
     ax.xaxis.labelpad = 10
     ax.yaxis.labelpad = 10
-    ax.set_ylim((-0.01, 0.04))
+
     fig.show()
     if saving:
-        fig.savefig(cache_folder+"/overfitting.png")
+        fig.savefig(cache_folder + "/overfitting.png")
+
     ##
     ##
     ##
@@ -104,7 +113,7 @@ def check_overfitting():
 
 def tt_results():
     datasets = []
-    for experiment in ["Raw ConvNet", "Raw DenseNet", "DCT ConvNet", "DCT DenseNet", "SLT ConvNet", "SLT DenseNet"]:
+    for experiment in ["RAW ConvNet", "RAW DenseNet", "DCT ConvNet", "DCT DenseNet", "SLT ConvNet", "SLT DenseNet"]:
         csv_file = "../_saved_logs/_logs_" + experiment + "/testing_results.csv"
         df = pd.read_csv(csv_file, header=None, delimiter=";")
         labels = [experiment for _ in range(int(df[0].size))]
@@ -118,64 +127,27 @@ def tt_results():
 
     datasets = pd.concat(datasets, axis=0)
 
-    metric = 1 - ((0.135-datasets["loss"])/0.135)
+    metric = 1 - ((0.13624-datasets["loss"])/0.13624)
     metric = np.asarray(metric)
     datasets["metric"] = metric
 
-    fig, ax = plt.subplots(figsize=(8, 5), dpi=my_dpi)
-
-    sns.catplot(ax=ax, x="experiment", y="loss", data=datasets, jitter=True, alpha=0.3, palette="cubehelix")
-    plt.ylabel("absolute loss")
-    sns.pointplot(ax=ax, x="experiment", y="loss",
-                  data=datasets, dodge=.532, join=False,
-                  markers="d", scale=1.6, ci=None, palette="cubehelix")
-    ax.set_ylabel("absolute loss")
-    ax.xaxis.labelpad = 10
-    ax.yaxis.labelpad = 10
-    fig.show()
-    if saving:
-        fig.savefig(cache_folder+"/absolute_loss.png")
-    ##
-    ##
-   
-    fig, ax = plt.subplots(figsize=(8, 5), dpi=my_dpi)
-
+    fig, ax = plt.subplots(figsize=(8/scale, 5/scale), dpi=my_dpi)
+    plt.xticks(rotation=20)
     sns.catplot(ax=ax, x="experiment", y="metric", data=datasets, jitter=True, alpha=0.3, palette="cubehelix")
-    plt.ylabel("relative loss")
+
     sns.pointplot(ax=ax, x="experiment", y="metric",
                   data=datasets, dodge=.532, join=False,
                   markers="d", scale=1.6, ci=None, palette="cubehelix")
-    ax.set_ylabel("relative loss")
+    ax.set_ylabel("Relative loss   " + r'$\epsilon_i=\frac{\lambda_i}{\lambda_{static}}$')
+    ax.set_xlabel("")
     ax.xaxis.labelpad = 10
     ax.yaxis.labelpad = 10
     fig.show()
     if saving:
-        fig.savefig(cache_folder+"/relative_loss.png")
-    ##
-    ##
-    fig, ax = plt.subplots(figsize=(8, 5), dpi=my_dpi)
-
-    sns.violinplot(ax=ax, x="experiment", y="loss", data=datasets,  palette="cubehelix")
-    plt.ylabel("absolute loss")
-    ax.set_ylabel("absolute loss")
-    ax.xaxis.labelpad = 10
-    ax.yaxis.labelpad = 10
-    fig.show()
-    if saving:
-        fig.savefig(cache_folder + "/absolute_loss_violin.png")
+        fig.savefig(cache_folder + "/testing_results.png")
     ##
     ##
 
-    fig, ax = plt.subplots(figsize=(8, 5), dpi=my_dpi)
-
-    sns.violinplot(ax=ax, x="experiment", y="metric", data=datasets, palette="cubehelix")
-    plt.ylabel("relative loss")
-    ax.set_ylabel("relative loss")
-    ax.xaxis.labelpad = 10
-    ax.yaxis.labelpad = 10
-    fig.show()
-    if saving:
-        fig.savefig(cache_folder + "/relative_loss_violin.png")
 
 
 def conv_testing_results():
@@ -243,7 +215,7 @@ def dense_testing_results():
 
 def optimizer_results():
     datasets = []
-    for experiment in ["Raw ConvNet", "Raw DenseNet", "DCT ConvNet", "DCT DenseNet", "SLT ConvNet", "SLT DenseNet"]:
+    for experiment in ["RAW ConvNet", "RAW DenseNet", "DCT ConvNet", "DCT DenseNet", "SLT ConvNet", "SLT DenseNet"]:
         csv_file = "../_saved_logs/_logs_" + experiment + "/optimizer_results.csv"
         df = pd.read_csv(csv_file, header=None, delimiter=";")
         labels = [experiment for _ in range(int(df[0].size))]
@@ -257,32 +229,32 @@ def optimizer_results():
 
     datasets = pd.concat(datasets, axis=0)
 
-    metric = 1 - ((0.135 - datasets["loss"]) / 0.135)
+    metric = 1 - ((0.13624 - datasets["loss"]) / 0.13624)
     metric = np.asarray(metric)
     datasets["metric"] = metric
 
-    fig, ax = plt.subplots(figsize=(8, 5), dpi=my_dpi)
-
-    sns.catplot(ax=ax, x="experiment", y="loss", data=datasets, jitter=True, alpha=0.3, palette="cubehelix")
+    fig, ax = plt.subplots(figsize=(8/scale, 5/scale), dpi=my_dpi)
+    plt.xticks(rotation=20)
+    sns.catplot(ax=ax, x="experiment", y="metric", data=datasets, jitter=True, alpha=0.3, palette="cubehelix")
     plt.ylabel("absolute loss")
-    sns.pointplot(ax=ax, x="experiment", y="loss",
+    sns.pointplot(ax=ax, x="experiment", y="metric",
                   data=datasets, dodge=.532, join=False,
                   markers="d", scale=1.6, ci=None, palette="cubehelix")
-    ax.set_ylabel("absolute loss")
+    ax.set_ylabel("Relative loss   "+r'$\epsilon_i=\frac{\lambda_i}{\lambda_{static}}$')
+    ax.set_xlabel("")
     ax.xaxis.labelpad = 10
     ax.yaxis.labelpad = 10
+
     fig.show()
     if saving:
-        fig.savefig(cache_folder + "/optimizer_absolute_loss.png")
+        fig.savefig(cache_folder + "/optimizer_results.png")
 
 
 def main():
-    sns.set(palette="cubehelix", style="whitegrid")
+    sns.set(palette="cubehelix", style="whitegrid", font="serif")
     tt_results()
-    check_overfitting()
-    conv_testing_results()
-    dense_testing_results()
     optimizer_results()
+    check_overfitting()
 
 
 if __name__ == "__main__":

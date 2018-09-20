@@ -149,6 +149,9 @@ class FauxLogger:
 
 
 class MessageLogger:
+    """
+    This is neccesary, because by default python logging is not process save.
+    """
     def __init__(self):
         filename = '_logs/optimizer_debug.log'
         logging.basicConfig(filename=filename, level=logging.DEBUG)

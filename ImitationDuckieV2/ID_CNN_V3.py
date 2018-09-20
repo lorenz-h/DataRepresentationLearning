@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """
-This file contains all the definitions for a single Network instance. Its setup_process function gets called
-by the Optimizer from ID_Asynchronous_Optimizer.
+This file contains all the definitions for a single Network instance. Its spawn_network function gets called
+by the Optimizer. It is also possible to run a standalone network that will fall back to the default parameters
+specified in _utils.ID_utils
 """
 
 import tensorflow as tf
@@ -12,8 +13,14 @@ from _utils.ID_utils import Logger, ParameterBatch, generate_logdir
 from ID_Input_Pipeline import create_dataset
 
 
-def cnn(x, args):
-    input_layer = tf.reshape(x, [-1, args.input_shape[0], args.input_shape[1], args.input_shape[2]])
+def cnn(x, params):
+    """
+    creates the tensorflow graph for a single convolutional neural network.
+    :param x: input tensor for the network with shape as defined in params.input_shape
+    :param params: ParameterBatch object containing all hyperparameters.
+    :return: output tensor for the network with shape batch_size x 1.
+    """
+    input_layer = tf.reshape(x, [-1, params.input_shape[0], params.input_shape[1], params.input_shape[2]])
     input_arr = input_layer
 
     def conv_layer(conv_input, convolution):
@@ -28,28 +35,41 @@ def cnn(x, args):
                                                 strides=2, name="pool_2d" + str(convolution[0]))
         return new_input_arr
 
-    for conv in args.convolutions:
+    for conv in params.convolutions:
         input_arr = conv_layer(input_arr, conv)
 
     pool2_flat = tf.layers.flatten(input_arr, name="FlattenBeforeDense")
-    dense = tf.layers.dense(inputs=pool2_flat, units=args.n_dense_nodes, activation=tf.nn.relu)
-    dense_2 = tf.layers.dense(inputs=dense, units=int(args.n_dense_nodes/2), activation=tf.nn.relu)
+    dense = tf.layers.dense(inputs=pool2_flat, units=params.n_dense_nodes, activation=tf.nn.relu)
+    dense_2 = tf.layers.dense(inputs=dense, units=int(params.n_dense_nodes/2), activation=tf.nn.relu)
     out = tf.layers.dense(inputs=dense_2, units=1, activation=None)
     return out
 
 
-def fnn(x, args):
-    input_layer = tf.reshape(x, [-1, args.input_shape[0], args.input_shape[1], args.input_shape[2]])
+def fnn(x, params):
+    """
+    creates the tensorflow graph for a single fully connected or dense neural network.
+    :param x: input tensor for the network with shape as defined in params.input_shape.
+    :param params: ParameterBatch object containing all hyperparameters.
+    :return: output tensor for the network with shape batch_size x 1.
+    """
+    input_layer = tf.reshape(x, [-1, params.input_shape[0], params.input_shape[1], params.input_shape[2]])
     flattened = tf.layers.flatten(input_layer, name="flatten_image")
     input_tensor = flattened
 
     def dense_layer(d_input, index):
+        """
+        Instanitates a new dense layer for the graph. This external function is neccesary for defining layers in
+        a loop otherwise the graph is not built correctly.
+        :param d_input: input tensor for the layer
+        :param index: index of the layer to be created
+        :return: output tensor of the layer
+        """
         dense = tf.layers.dense(inputs=d_input,
-                                units=int(args.n_dense_nodes / (index*args.dense_size_convergence + 1)),
+                                units=int(params.n_dense_nodes / (index*params.dense_size_convergence + 1)),
                                 activation=tf.nn.relu, name="dense_" + str(index))
         return dense
 
-    for i in range(args.n_dense_layers):
+    for i in range(params.n_dense_layers):
         input_tensor = dense_layer(input_tensor, i)
     dense_no_activation = tf.layers.dense(inputs=input_tensor, units=20, activation=None, name="continuation_layer")
     out = tf.layers.dense(inputs=dense_no_activation, units=1, activation=None, name="output_node")
@@ -57,6 +77,11 @@ def fnn(x, args):
 
 
 def spawn_network(params):
+    """
+    creates a single network instance.
+    :param params: ParameterBatch object containing all hyperparameters.
+    :return: either the best eval_loss achieved or the test_loss depending on params.testing.
+    """
 
     try:
 

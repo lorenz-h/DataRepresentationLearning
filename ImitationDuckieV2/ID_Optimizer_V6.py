@@ -1,3 +1,6 @@
+"""
+This file contains all the definitons for an Optimization Cycle, mainly in start_optimization
+"""
 from skopt.space import Real, Integer
 
 import multiprocessing as mp
@@ -7,13 +10,15 @@ import time
 
 from ID_CNN_V3 import spawn_network
 from _utils.ID_utils import check_available_gpus, LoggableOptimizer, map_point_to_param_batch,\
-    ParameterBatch, log_default_params, limit_size, MessageLogger, Timer
+    ParameterBatch, log_default_params, MessageLogger, Timer
 
 max_n_points = 60
 max_n_gpus = 6
 
-default_params = ParameterBatch()
+default_params = ParameterBatch()  # load the default hyperparameters as defined in _utils.ID_utils.py
 
+#####################################################################################################################
+#  DEFINE DIMENSIONS AND CONSTRAINTS FOR THE BAYESIAN OPTIMIZATION
 if default_params.use_conv_net:
     dim_learning_rate = Real(low=1e-9, high=3e-1, prior='log-uniform', name='learning_rate')
     dim_n_convolutions = Integer(low=1, high=4, name='n_convolutions')
@@ -28,9 +33,19 @@ else:
     dim_dense_n_layers = Integer(low=3, high=6, name='n_layers')
 
     optimizer_dimensions = [dim_dense_learning_rate, dim_dense_nodes, dim_dense_size_convergence, dim_dense_n_layers]
+#####################################################################################################################
 
 
-def optimizer_process(reserved_gpus, logger):
+def start_optimization(reserved_gpus, logger):
+    """
+    runs an optimization on networks created by spawn_network. len(reserved_gpus) points are evaluated in parallel,
+    unless the limit max_n_points is about to be reached. The results of the optimization are saved to a csv file in
+    _logs. The ten best results are retrained and subsequently tested on the testing dataset and these results are
+    also saved to a csv file in _logs.
+    :param reserved_gpus: the gpus which are available for the optimizer to use
+    :param logger: the logger the process should write to.
+    :return: ---
+    """
     timer = Timer()
     optimizer = LoggableOptimizer(dimensions=optimizer_dimensions, random_state=1)
     n_points_solved = 0
@@ -88,6 +103,7 @@ def optimizer_process(reserved_gpus, logger):
 
 
 def main():
+
     command_str = "(rm -r _logs)"
     subprocess.run(command_str, shell=True)
     command_str = "(mkdir _logs)"
@@ -100,7 +116,7 @@ def main():
     logger.put("Using GPUs: "+str(reserved_gpus))
 
     log_default_params(logger)
-    optimizer_process(reserved_gpus, logger)
+    start_optimization(reserved_gpus, logger)
 
 
 if __name__ == "__main__":
