@@ -118,6 +118,7 @@ def spawn_network(params):
             return test_loss
 
         tf.reset_default_graph()
+        tf.set_random_seed(1234)
 
         train_data = create_dataset(params.batch_size, params.train_csv_file)
         eval_data = create_dataset(params.batch_size, params.eval_csv_file)

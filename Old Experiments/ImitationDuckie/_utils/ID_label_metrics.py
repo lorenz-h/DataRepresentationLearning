@@ -1,9 +1,15 @@
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 """
 This prints and illustrates some interesting facts about the labels stored in the cvs files in csv_files.
 """
+scale = 1.25
+my_dpi = 200
+
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif')
 
 csv_files = ("hetzell_training_data.csv", "hetzell_evaluation_data.csv", "hetzell_testing_data.csv")
 
@@ -27,8 +33,10 @@ print("Variance:", variance)
 print("VarianceLabels:", varianceLabels)
 print("Standard Deviation", std)
 
-plt.title("Absolute Label Size")
+fig, ax = plt.subplots(figsize=(6/scale, 4/scale), dpi=my_dpi)
 bins = [x / 200 for x in range(0, 200)]
-plt.hist(np.abs(labels), bins=bins)
-plt.show()
+plt.hist(np.abs(labels), bins=bins, density=True)
+ax.set_ylabel("frequency in \%")
+ax.set_xlabel(r'$\| \omega \|$')
+fig.show()
 
