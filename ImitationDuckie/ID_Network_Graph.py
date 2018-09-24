@@ -9,7 +9,7 @@ import tensorflow as tf
 import os
 import subprocess
 
-from _utils.ID_utils import Logger, ParameterBatch, generate_logdir
+from _utils.ID_utils import Logger, ParameterBatch, generate_logdir, check_available_gpus
 from ID_Input_Pipeline import create_dataset
 
 
@@ -187,9 +187,14 @@ def spawn_network(params):
 
 
 def main():
-    command_str = "(rm -r _logs)"
+    """
+    This allows to run a standalone version of the network using the default parameters defined in _utils/ID_utils.py.
+    :return:
+    """
+    gpu_id = check_available_gpus(max_n_gpus=1)[0]
+    params = ParameterBatch(gpu_id=gpu_id, testing=False)
+    command_str = "(rm -r " + params.logdir + ")"
     subprocess.run(command_str, shell=True)
-    params = ParameterBatch(gpu_id=7, testing=False)
     spawn_network(params)
 
 

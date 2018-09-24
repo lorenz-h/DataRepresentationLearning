@@ -13,12 +13,13 @@ import numpy as np
 import logging
 
 
-def check_available_gpus(max_n_gpus):
+def check_available_gpus(max_n_gpus, logger):
     """
     This function runs nvidia-smi --id=gpu and captures the output. If it finds that there are no jobs running on a
     gpu it returns the gpus id.
     :return: the id of the first gpu found to be available
     """
+    logger.put("searching for gpus...")
     system_gpus = 8
     gpus = []
     for gpu in range(system_gpus):
@@ -29,6 +30,7 @@ def check_available_gpus(max_n_gpus):
         if len(gpus) == max_n_gpus:
             break
     assert len(gpus) is not 0, "All GPUs are currently busy."
+    logger.put("Using GPUs: " + str(gpus))
     return gpus
 
 
@@ -85,8 +87,11 @@ def clear_logdir(logdir):
     :param logdir: the relative path to the logdir to be deleted
     :return: ---
     """
-    command_str = "rm -r " + logdir
+    command_str = "(rm -r " + logdir + ")"
     subprocess.run(command_str, shell=True)
+    command_str = "(mkdir " + logdir + ")"
+    subprocess.run(command_str, shell=True)
+
     print("Empty Directory", logdir, "is available.")
 
 
@@ -152,8 +157,8 @@ class MessageLogger:
     """
     This is neccesary, because by default python logging is not process save.
     """
-    def __init__(self):
-        filename = '_logs/optimizer_debug.log'
+    def __init__(self, logdir):
+        filename = logdir+'/optimizer_debug.log'
         logging.basicConfig(filename=filename, level=logging.DEBUG)
 
     def put(self, msg):
@@ -176,10 +181,12 @@ class ParameterBatch:
                  n_max_epochs=90,
                  dense_size_convergence=1.3,
                  testing=False,
+                 use_conv_net=False,
                  n_runs=1,
                  train_csv_file="_data/hetzell_shearlet_training_data.csv",
                  eval_csv_file="_data/hetzell_shearlet_evaluation_data.csv",
-                 test_csv_file="_data/hetzell_shearlet_testing_data.csv"
+                 test_csv_file="_data/hetzell_shearlet_testing_data.csv",
+                 logdir="_logs"
                  ):
         self.learning_rate = learning_rate
         self.input_shape = input_shape
@@ -194,10 +201,11 @@ class ParameterBatch:
         self.eval_csv_file = eval_csv_file
         self.logger = FauxLogger()
         self.testing = testing
-        self.use_conv_net = False
+        self.use_conv_net = use_conv_net
         self.n_dense_layers = n_dense_layers
         self.dense_size_convergence = dense_size_convergence
         self.conv_size_divergence = conv_size_divergence
+        self.lodir = logdir
 
 
 def yes_or_no(question):
@@ -207,18 +215,18 @@ def yes_or_no(question):
     if reply[0] == 'n':
         return False
     else:
-        return yes_or_no("Uhhhh... please enter ")
+        return yes_or_no("PLease answer using")
 
 
 class LoggableOptimizer(skopt.Optimizer):
     """
     This class inherits from the skopt Optimizer class. All it does is add logging functionality.
     """
-    def __init__(self, dimensions, random_state, csv_file='_logs/optimizer_results.csv', logging=True):
+    def __init__(self, dimensions, random_state, logdir, csv_file='optimizer_results.csv', logging_bool=True):
         skopt.Optimizer.__init__(self, dimensions=dimensions, random_state=random_state)
         self._lock = mp.Lock()
-        self.logging = logging
-        self.log_file = csv_file
+        self.logging = logging_bool
+        self.log_file = logdir+"/"+csv_file
 
     def log_state(self):
         with self._lock:
@@ -282,7 +290,7 @@ def generate_logdir(args):
         experiment_logdir = "gpu" + str(args.gpu_id) + "_" + str(args.learning_rate) + \
                             str(args.n_dense_nodes) + "_" + str(args.dense_size_convergence) + \
                             "_" + str(args.n_dense_layers) + str(args.testing)
-    logdir = os.path.join("_logs", experiment_logdir)
+    logdir = os.path.join(args.logdir, experiment_logdir)
     return logdir
 
 
