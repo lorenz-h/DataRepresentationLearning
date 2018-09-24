@@ -1,3 +1,7 @@
+"""
+This script is used to visualize the results obtained in mutliple runs of the Bayesian Optimization.
+"""
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
@@ -97,7 +101,7 @@ def check_overfitting():
     sns.pointplot(ax=ax, x="experiment", y="deltaloss",
                   data=results, dodge=.532, join=False,
                   markers="d", scale=1.6, ci=None, palette="cubehelix")
-    ax.set_ylabel("Delta loss   " + r'$=\lambda_{eval}-\lambda_{test}$')
+    ax.set_ylabel("Delta loss   " + r'$=\lambda_{test}-\lambda_{eval}$')
     ax.set_xlabel("")
     ax.xaxis.labelpad = 10
     ax.yaxis.labelpad = 10

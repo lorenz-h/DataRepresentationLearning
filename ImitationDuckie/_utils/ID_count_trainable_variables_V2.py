@@ -1,3 +1,6 @@
+"""
+This script is used to count the number of trainable variables for the best networks from all experiments.
+"""
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt

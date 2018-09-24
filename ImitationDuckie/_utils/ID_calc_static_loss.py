@@ -1,12 +1,16 @@
+"""
+This script is used to calculate the static loss for a dataset, read from csv files specifies in csv_files.
+"""
+
 import csv
 import numpy as np
+
+csv_files = ["hetzell_raw_training_data.csv", "hetzell_raw_testing_data.csv", "hetzell_raw_evaluation_data.csv"]
 
 
 def load_labels():
     labels = []
-    for csv_file in ["hetzell_raw_training_data.csv",
-                     "hetzell_raw_testing_data.csv",
-                     "hetzell_raw_evaluation_data.csv"]:
+    for csv_file in csv_files:
         with open('../_data/'+csv_file, newline='') as csvfile:
             spamreader = csv.reader(csvfile, delimiter=',', quotechar='|')
             for row in spamreader:

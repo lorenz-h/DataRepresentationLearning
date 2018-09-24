@@ -1,3 +1,7 @@
+"""
+This script calculates the average loss for all experiments.
+"""
+
 import pandas as pd
 import numpy as np
 

@@ -8,7 +8,7 @@ import subprocess
 import csv
 import time
 
-from ID_CNN_V3 import spawn_network
+from ID_Network_Graph import spawn_network
 from _utils.ID_utils import check_available_gpus, LoggableOptimizer, map_point_to_param_batch,\
     ParameterBatch, log_default_params, MessageLogger, Timer
 
