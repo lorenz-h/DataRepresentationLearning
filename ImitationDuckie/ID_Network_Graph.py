@@ -30,9 +30,10 @@ def cnn(x, params):
             kernel_size=[convolution[1], convolution[2]],
             padding="same",
             activation=tf.nn.relu,
-            name="conv" + str(convolution[0]))
+            name=f"conv{convolution[0]}"
+        )
         new_input_arr = tf.layers.max_pooling2d(inputs=cnv, pool_size=[3, 3],
-                                                strides=2, name="pool_2d" + str(convolution[0]))
+                                                strides=2, name=f"pool_2d_{convolution[0]}")
         return new_input_arr
 
     for conv in params.convolutions:
@@ -66,7 +67,7 @@ def fnn(x, params):
         """
         dense = tf.layers.dense(inputs=d_input,
                                 units=int(params.n_dense_nodes / (index*params.dense_size_convergence + 1)),
-                                activation=tf.nn.relu, name="dense_" + str(index))
+                                activation=tf.nn.relu, name=f"dense_{index}")
         return dense
 
     for i in range(params.n_dense_layers):
@@ -144,10 +145,10 @@ def spawn_network(params):
 
         optimizer = tf.train.AdamOptimizer(learning_rate=params.learning_rate).minimize(loss)
 
-        logdir = generate_logdir(params)
+        exp_logdir = generate_logdir(params)
 
-        training_logger = Logger(logdir + "/train")
-        evaluation_logger = Logger(logdir + "/eval")
+        training_logger = Logger(exp_logdir / "train")
+        evaluation_logger = Logger(exp_logdir / "eval")
 
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
@@ -165,7 +166,7 @@ def spawn_network(params):
                     except tf.errors.OutOfRangeError:
                         break
                 if epoch % 3 == 2:
-                    params.logger.put("Evaluating performance in epoch " + str(epoch))
+                    params.logger.put(f"Evaluating performance in epoch {epoch}")
                     current_loss = float(evaluation(epoch))
                     eval_losses.append(current_loss)
                     better_results = [a for a in eval_losses if (a < current_loss) is True]
@@ -181,7 +182,7 @@ def spawn_network(params):
                 return testing()
 
     except tf.errors.ResourceExhaustedError:
-        params.logger.put("Child on "+str(params.gpu_id)+" encountered OOM.")
+        params.logger.put(f"Child on {params.gpu_id} encountered OOM.")
         tf.reset_default_graph()
         return 2.0
 

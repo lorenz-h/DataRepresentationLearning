@@ -92,8 +92,8 @@ def start_optimization(reserved_gpus, logger):
         test_results = test_results + list(zip(lss, batch))
         p.close()
     logger.put(test_results)
-    logger.put("Testing ended after " + str(timer.stop()) + " hours")
-    csv_file = default_params.logdir+'/testing_results.csv'
+    logger.put(f"Testing ended after {str(timer.stop())} hours")
+    csv_file = default_params.logdir / "testing_results.csv"
     with open(csv_file, 'w') as file:
         writer = csv.writer(file, delimiter=';')
         for row in test_results:

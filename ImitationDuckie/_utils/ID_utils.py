@@ -4,8 +4,8 @@ import os
 from os import listdir
 import multiprocessing as mp
 import csv
-import sys
 import time
+from pathlib import Path
 
 import tensorflow as tf
 import skopt
@@ -103,7 +103,6 @@ def calc_average_label_size(dataset_dir):
     labels = []
     for subdir in ("Training", "Testing"):
         path = dataset_dir + "/" + subdir + "/"
-
         for file in os.listdir(path):
             if file.endswith(".txt"):
                 f = open(path + file, 'r')
@@ -158,7 +157,7 @@ class MessageLogger:
     This is neccesary, because by default python logging is not process save.
     """
     def __init__(self, logdir):
-        filename = logdir+'/optimizer_debug.log'
+        filename = logdir / 'optimizer_debug.log'
         logging.basicConfig(filename=filename, level=logging.DEBUG)
 
     def put(self, msg):
@@ -183,10 +182,10 @@ class ParameterBatch:
                  testing=False,
                  use_conv_net=False,
                  n_runs=1,
-                 train_csv_file="_data/hetzell_shearlet_training_data.csv",
-                 eval_csv_file="_data/hetzell_shearlet_evaluation_data.csv",
-                 test_csv_file="_data/hetzell_shearlet_testing_data.csv",
-                 logdir="_logs"
+                 train_csv_file=Path("_data/hetzell_shearlet_training_data.csv"),
+                 eval_csv_file=Path("_data/hetzell_shearlet_evaluation_data.csv"),
+                 test_csv_file=Path("_data/hetzell_shearlet_testing_data.csv"),
+                 logdir=Path("_logs")
                  ):
         self.learning_rate = learning_rate
         self.input_shape = input_shape
@@ -226,7 +225,7 @@ class LoggableOptimizer(skopt.Optimizer):
         skopt.Optimizer.__init__(self, dimensions=dimensions, random_state=random_state)
         self._lock = mp.Lock()
         self.logging = logging_bool
-        self.log_file = logdir+"/"+csv_file
+        self.log_file = logdir / csv_file
 
     def log_state(self):
         with self._lock:
@@ -284,14 +283,15 @@ def limit_size(list_obj, max_size):
 
 def generate_logdir(args):
     if args.use_conv_net:
-        experiment_logdir = "gpu" + str(args.gpu_id) + "_" + str(args.learning_rate) + \
-                            str(args.n_dense_nodes) + "_" + str(len(args.convolutions)) + str(args.testing)
+        experiment_logdir = f"gpu{args.gpu_id}_{args.learning_rate}_{args.n_dense_nodes}_" \
+                            f"{args.n_dense_nodes}_{len(args.convolutions)}_{args.testing}"
+
     else:
-        experiment_logdir = "gpu" + str(args.gpu_id) + "_" + str(args.learning_rate) + \
-                            str(args.n_dense_nodes) + "_" + str(args.dense_size_convergence) + \
-                            "_" + str(args.n_dense_layers) + str(args.testing)
-    logdir = os.path.join(args.logdir, experiment_logdir)
-    return logdir
+        experiment_logdir = f"gpu{args.gpu_id}_{args.learning_rate}_{args.n_dense_nodes}_" \
+                            f"{args.dense_size_convergence}_{args.n_dense_layers}_{args.testing}"
+
+    exp_logdir = Path(args.logdir / experiment_logdir)
+    return exp_logdir
 
 
 class Timer:
