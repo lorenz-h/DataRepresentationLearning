@@ -1,6 +1,6 @@
 .idea
 logs/
-_logs/
+
 _logs_raw/
 _logs_shearlets/
 RandomScriptsLatex/
